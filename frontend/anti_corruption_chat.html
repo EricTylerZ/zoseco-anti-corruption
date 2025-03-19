@@ -1,0 +1,120 @@
+<div id="query-container" class="et_pb_module et_pb_text">
+    <h2 class="et_pb_module_header">Submit a Tip for Anti-Corruption Efforts</h2>
+    <textarea id="query-input" rows="4" placeholder="Please share any information you have that could assist in ending corruption in Valparaiso Indiana. Your responses will be logged. If there is an imminent emergency please contact law enforcement. Zoseco is not law enforcement, and is only collecting and compiling information in the hopes of challenging corruption."></textarea>
+    <div class="et_pb_button_module_wrapper">
+        <a id="submit-query" class="et_pb_button et_pb_button_0" href="#">Send</a>
+    </div>
+    <div id="response-container" class="et_pb_text_inner"></div>
+</div>
+
+<style>
+    #query-container {
+        max-width: 600px;
+        margin: 20px auto;
+    }
+    #query-input {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        box-sizing: border-box;
+    }
+    .et_pb_button_module_wrapper {
+        display: inline-block;
+    }
+    #submit-query.et_pb_button {
+        padding: 10px 20px;
+        border-radius: 5px;
+        transition: all 300ms ease 0ms;
+    }
+    #response-container {
+        margin-top: 20px;
+        padding: 15px;
+        background-color: #f9f9f9;
+        border-radius: 5px;
+        white-space: pre-wrap;
+    }
+    .message {
+        margin-bottom: 15px;
+    }
+    .user-message {
+        font-size: 18px; /* Matches typical H4 size in Divi */
+        font-weight: bold;
+        line-height: 1.3em; /* Common Divi heading line height */
+        color: #00918B !important; /* Matches your theme's button color */
+    }
+    .assistant-message {
+        font-size: 16px; /* Body text size */
+    }
+</style>
+
+<script>
+    const SERVER_URL = "https://anti-corruption-bot.vercel.app";
+    let chatId = localStorage.getItem("chat_id") || Date.now().toString();
+
+    document.getElementById("submit-query").addEventListener("click", submitQuery);
+
+    fetch(`${SERVER_URL}/api/history?chat_id=${chatId}`, { method: "GET" })
+        .then(response => {
+            if (!response.ok) throw new Error(`History fetch failed: ${response.status}`);
+            return response.json();
+        })
+        .then(data => displayHistory(data.history))
+        .catch(error => {
+            console.error("History fetch error:", error);
+            document.getElementById("response-container").innerHTML += `<div class="message assistant-message">Error loading history: ${error.message}</div>`;
+        });
+
+    async function submitQuery(event) {
+        event.preventDefault(); // Prevent default anchor behavior
+        const queryInput = document.getElementById("query-input");
+        const query = queryInput.value.trim();
+        if (!query) return;
+
+        const responseContainer = document.getElementById("response-container");
+        responseContainer.innerHTML += `<div class="message user-message">You: ${query}</div>`;
+
+        try {
+            const response = await fetch(`${SERVER_URL}/api/query`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                },
+                body: JSON.stringify({ query, chat_id: chatId }),
+                mode: "cors"
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Server error: ${response.status} - ${errorText}`);
+            }
+
+            const data = await response.json();
+
+            if (data.error) {
+                responseContainer.innerHTML += `<div class="message assistant-message">Error: ${data.error}</div>`;
+            } else {
+                responseContainer.innerHTML += `<div class="message assistant-message">Assistant: ${data.response}</div>`;
+                localStorage.setItem("chat_id", data.chat_id);
+            }
+        } catch (error) {
+            console.error("Query fetch error:", error);
+            responseContainer.innerHTML += `<div class="message assistant-message">Error: ${error.message}</div>`;
+        }
+
+        queryInput.value = "";
+        responseContainer.scrollTop = responseContainer.scrollHeight;
+    }
+
+    function displayHistory(history) {
+        const responseContainer = document.getElementById("response-container");
+        history.forEach(msg => {
+            const className = msg.role === "user" ? "user-message" : "assistant-message";
+            const prefix = msg.role === "user" ? "You" : "Assistant";
+            responseContainer.innerHTML += `<div class="message ${className}">${prefix}: ${msg.content}</div>`;
+        });
+        responseContainer.scrollTop = responseContainer.scrollHeight;
+    }
+</script>
