@@ -6,12 +6,13 @@ import redis
 import json
 import logging
 
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # Enable CORS for all routes
 
 # Venice AI API configuration
 VENICE_API_URL = "https://api.venice.ai/api/v1/chat/completions"
@@ -27,30 +28,14 @@ except Exception as e:
     logger.error(f"Redis connection failed: {e}")
     redis_client = None
 
-# Fetch most intelligent model at startup
-def get_most_intelligent_model():
-    try:
-        headers = {"Authorization": f"Bearer {VENICE_API_KEY}"}
-        response = requests.get("https://api.venice.ai/api/v1/models", headers=headers, timeout=5)
-        response.raise_for_status()
-        models = response.json()["data"]
-        for model in models:
-            if "most_intelligent" in model.get("traits", []):
-                logger.info(f"Selected most intelligent model: {model['id']}")
-                return model["id"]
-        logger.warning("No 'most_intelligent' model found, falling back to 'default'")
-        return "default"
-    except Exception as e:
-        logger.error(f"Failed to fetch models: {e}")
-        return "default"
-
-MODEL_ID = get_most_intelligent_model()  # Set model at startup
+# System prompt from environment variable
+SYSTEM_PROMPT = os.environ.get("SYSTEM_PROMPT", "You are an anti-corruption expert. Be concise and helpful.")  # Default fallback
 
 @app.route("/", methods=["GET"])
 def test_route():
     logger.info("Root route accessed")
     key_preview = VENICE_API_KEY[:4] + "..." if VENICE_API_KEY else "Not set"
-    return jsonify({"message": "API is running", "redis_connected": bool(redis_client), "venice_api_key_preview": key_preview, "selected_model": MODEL_ID})
+    return jsonify({"message": "API is running", "redis_connected": bool(redis_client), "venice_api_key_preview": key_preview})
 
 @app.route("/api/query", methods=["POST"])
 def handle_query():
@@ -76,9 +61,9 @@ def handle_query():
         "Content-Type": "application/json"
     }
     payload = {
-        "model": MODEL_ID,  # Use dynamically selected model
+        "model": "llama-3.1-405b",
         "messages": [
-            {"role": "system", "content": "You are an anti-corruption expert assisting users at zoseco.com. Be concise and helpful."},
+            {"role": "system", "content": SYSTEM_PROMPT},  # Use env variable
             *chat_history[-5:],
         ],
         "max_tokens": 200,
