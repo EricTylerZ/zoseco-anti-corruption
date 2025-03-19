@@ -43,10 +43,12 @@ def handle_query():
     if not user_query:
         return jsonify({"error": "No query provided"}), 400
 
+    # Load history
     chat_history_json = redis_client.get(chat_id)
     chat_history = json.loads(chat_history_json) if chat_history_json else []
     chat_history.append({"role": "user", "content": user_query})
 
+    # Venice AI API call
     headers = {
         "Authorization": f"Bearer {VENICE_API_KEY}",
         "Content-Type": "application/json"
@@ -62,23 +64,28 @@ def handle_query():
     }
 
     try:
+        logger.info(f"Sending request to Venice AI: {payload}")
         response = requests.post(VENICE_API_URL, headers=headers, json=payload, timeout=10)
         response.raise_for_status()
         result = response.json()
+        logger.info(f"Venice AI response: {result}")
 
         ai_response = result["choices"][0]["message"]["content"].strip()
         chat_history.append({"role": "assistant", "content": ai_response})
 
         redis_client.setex(chat_id, 86400, json.dumps(chat_history))
-        logger.info(f"Query processed for chat_id: {chat_id}")
+        logger.info(f"Saved chat history for chat_id: {chat_id}")
         return jsonify({
             "response": ai_response,
             "chat_id": chat_id,
             "history": chat_history
         })
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Venice AI request failed: {str(e)} - Response: {e.response.text if e.response else 'No response'}")
+        return jsonify({"error": f"Failed to get response from AI: {str(e)}"}), 500
     except Exception as e:
-        logger.error(f"Error querying Venice AI: {e}")
-        return jsonify({"error": "Failed to get response from AI"}), 500
+        logger.error(f"Unexpected error: {str(e)}")
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 @app.route("/api/history", methods=["GET"])
 def get_history():
