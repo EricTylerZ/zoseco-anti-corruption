@@ -3,6 +3,11 @@ import requests
 import os
 import redis
 import json
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -14,18 +19,20 @@ VENICE_API_KEY = os.environ.get("VENICE_API_KEY", "your-venice-api-key-here")
 REDIS_URL = os.environ.get("REDIS_URL")
 try:
     redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
-    redis_client.ping()  # Test connection
-    print("Redis connected successfully")
+    redis_client.ping()
+    logger.info("Redis connected successfully")
 except Exception as e:
-    print(f"Redis connection failed: {e}")
+    logger.error(f"Redis connection failed: {e}")
     redis_client = None
 
 @app.route("/", methods=["GET"])
 def test_route():
+    logger.info("Root route accessed")
     return jsonify({"message": "API is running", "redis_connected": bool(redis_client)})
 
-@app.route("/query", methods=["POST"])
+@app.route("/api/query", methods=["POST"])
 def handle_query():
+    logger.info("Query route accessed")
     if not redis_client:
         return jsonify({"error": "Redis not configured"}), 500
 
@@ -36,12 +43,10 @@ def handle_query():
     if not user_query:
         return jsonify({"error": "No query provided"}), 400
 
-    # Load existing history from Redis
     chat_history_json = redis_client.get(chat_id)
     chat_history = json.loads(chat_history_json) if chat_history_json else []
     chat_history.append({"role": "user", "content": user_query})
 
-    # Venice AI API request
     headers = {
         "Authorization": f"Bearer {VENICE_API_KEY}",
         "Content-Type": "application/json"
@@ -64,20 +69,20 @@ def handle_query():
         ai_response = result["choices"][0]["message"]["content"].strip()
         chat_history.append({"role": "assistant", "content": ai_response})
 
-        # Save to Redis with 24-hour expiration
         redis_client.setex(chat_id, 86400, json.dumps(chat_history))
-
+        logger.info(f"Query processed for chat_id: {chat_id}")
         return jsonify({
             "response": ai_response,
             "chat_id": chat_id,
             "history": chat_history
         })
     except Exception as e:
-        print(f"Error querying Venice AI: {e}")
+        logger.error(f"Error querying Venice AI: {e}")
         return jsonify({"error": "Failed to get response from AI"}), 500
 
-@app.route("/history", methods=["GET"])
+@app.route("/api/history", methods=["GET"])
 def get_history():
+    logger.info("History route accessed")
     if not redis_client:
         return jsonify({"error": "Redis not configured"}), 500
 
@@ -86,8 +91,9 @@ def get_history():
     chat_history = json.loads(chat_history_json) if chat_history_json else []
     return jsonify({"history": chat_history})
 
-@app.route("/all_chats", methods=["GET"])
+@app.route("/api/all_chats", methods=["GET"])
 def get_all_chats():
+    logger.info("All chats route accessed")
     if not redis_client:
         return jsonify({"error": "Redis not configured"}), 500
 
@@ -100,4 +106,4 @@ def get_all_chats():
     return jsonify({"chats": all_chats})
 
 if __name__ == "__main__":
-    app.run()
+    app.run(host="0.0.0.0", port=5000)
