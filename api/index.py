@@ -11,8 +11,18 @@ VENICE_API_URL = "https://api.venice.ai/v1/chat/completions"
 VENICE_API_KEY = os.environ.get("VENICE_API_KEY", "your-venice-api-key-here")
 
 # Upstash Redis configuration
-REDIS_URL = os.environ.get("UPSTASH_REDIS_URL")  # Provided by Upstash Marketplace
-redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True) if REDIS_URL else None
+REDIS_URL = os.environ.get("REDIS_URL")
+try:
+    redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
+    redis_client.ping()  # Test connection
+    print("Redis connected successfully")
+except Exception as e:
+    print(f"Redis connection failed: {e}")
+    redis_client = None
+
+@app.route("/", methods=["GET"])
+def test_route():
+    return jsonify({"message": "API is running", "redis_connected": bool(redis_client)})
 
 @app.route("/query", methods=["POST"])
 def handle_query():
