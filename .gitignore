@@ -4,3 +4,7 @@ venv/
 __pycache__/
 *.pyc
 .vercel
+
+anti_corruption_chats.json
+
+parse_chats.py
