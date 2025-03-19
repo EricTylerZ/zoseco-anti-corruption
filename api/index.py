@@ -1,11 +1,10 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask import Flask, request, jsonify, Response
 import requests
 import os
 import redis
 import json
 import logging
-
+from flask_cors import CORS
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -29,7 +28,7 @@ except Exception as e:
     redis_client = None
 
 # System prompt from environment variable
-SYSTEM_PROMPT = os.environ.get("SYSTEM_PROMPT", "You are an anti-corruption expert. Be concise and helpful.")  # Default fallback
+SYSTEM_PROMPT = os.environ.get("SYSTEM_PROMPT", "You are an anti-corruption expert. Be concise and helpful.")
 
 @app.route("/", methods=["GET"])
 def test_route():
@@ -63,7 +62,7 @@ def handle_query():
     payload = {
         "model": "llama-3.1-405b",
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},  # Use env variable
+            {"role": "system", "content": SYSTEM_PROMPT},
             *chat_history[-5:],
         ],
         "max_tokens": 200,
@@ -117,6 +116,19 @@ def get_all_chats():
 
     keys = redis_client.keys("*")
     all_chats = {key: json.loads(redis_client.get(key)) for key in keys if redis_client.get(key)}
+
+    # Check for download parameter
+    if request.args.get("download") == "true":
+        # Format JSON with indentation for readability
+        formatted_json = json.dumps({"chats": all_chats}, indent=2)
+        # Return as a downloadable file
+        return Response(
+            formatted_json,
+            mimetype="application/json",
+            headers={"Content-Disposition": "attachment; filename=anti_corruption_chats.json"}
+        )
+    
+    # Default JSON response
     return jsonify({"chats": all_chats})
 
 if __name__ == "__main__":
