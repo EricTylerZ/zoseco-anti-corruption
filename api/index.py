@@ -37,13 +37,8 @@ MODEL = "llama-3.1-405b"
 @app.route("/", methods=["GET"])
 def test_route():
     logger.info("Root route accessed")
-    return jsonify({"message": "API is running", "redis_connected": bool(redis_client)})
-
-@app.route("/favicon.ico", methods=["GET"])
-@app.route("/favicon.png", methods=["GET"])
-def favicon():
-    # Return a minimal response to avoid 404s
-    return Response("", status=204)  # No Content
+    key_preview = VENICE_API_KEY[:4] + "..." if VENICE_API_KEY else "Not set"
+    return jsonify({"message": "API is running", "redis_connected": bool(redis_client), "venice_api_key_preview": key_preview})
 
 @app.route("/api/query", methods=["POST"])
 def handle_query():
@@ -89,7 +84,7 @@ def handle_query():
     }
 
     try:
-        logger.info(f"Sending request to Venice AI - Payload: {payload}")
+        logger.info(f"Sending request to Venice AI with key: {VENICE_API_KEY[:4]}... - Payload: {payload}")
         response = requests.post(VENICE_API_URL, headers=headers, json=payload, timeout=10)
         response.raise_for_status()
         result = response.json()
@@ -107,7 +102,8 @@ def handle_query():
         }
         chat_history.append(ai_message)
 
-        redis_client.set(chat_id, json.dumps(chat_history))
+        # Save without expiration
+        redis_client.set(chat_id, json.dumps(chat_history))  # Changed from setex to set
         logger.info(f"Saved chat history for chat_id: {chat_id}")
         return jsonify({
             "response": ai_response,
@@ -148,22 +144,24 @@ def get_all_chats():
         chat_history_json = redis_client.get(key)
         if chat_history_json:
             chat_history = json.loads(chat_history_json)
+            # Enrich old entries with default metadata if missing
             enriched_history = []
             for msg in chat_history:
                 if not isinstance(msg, dict):
-                    continue
+                    continue  # Skip malformed entries
                 enriched_msg = {
                     "content": msg.get("content", ""),
                     "role": msg.get("role", ""),
-                    "timestamp": msg.get("timestamp", datetime.utcnow().isoformat()),
-                    "ip": msg.get("ip", "unknown"),
-                    "model": msg.get("model", MODEL),
-                    "tokens_in": msg.get("tokens_in", len(msg.get("content", "").split())),
+                    "timestamp": msg.get("timestamp", datetime.utcnow().isoformat()),  # Default to now if missing
+                    "ip": msg.get("ip", "unknown"),  # Default if missing
+                    "model": msg.get("model", MODEL),  # Assume current model
+                    "tokens_in": msg.get("tokens_in", len(msg.get("content", "").split())),  # Estimate if missing
                     "tokens_out": msg.get("tokens_out", len(msg.get("content", "").split())) if msg.get("role") == "assistant" else 0
                 }
                 enriched_history.append(enriched_msg)
             all_chats[key] = enriched_history
 
+    # Check for download parameter
     if request.args.get("download") == "true":
         formatted_json = json.dumps({"chats": all_chats}, indent=2)
         return Response(
