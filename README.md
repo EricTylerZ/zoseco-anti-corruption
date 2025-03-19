@@ -13,7 +13,7 @@ The Anti-Corruption Bot is live at [zoseco.com/anti-corruption](https://zoseco.c
 
 - **Frontend**: A chat interface built into the Zoseco WordPress site using Divi.
 - **Backend**: A Flask app hosted on Vercel, powered by the Venice AI API (`llama-3.1-405b` model).
-- **Storage**: Chat histories are stored in Upstash Redis with a 24-hour expiration.
+- **Storage**: Chat histories are stored in Upstash Redis with no expiration.
 
 ## Usage
 
@@ -35,7 +35,7 @@ The Anti-Corruption Bot is live at [zoseco.com/anti-corruption](https://zoseco.c
 ## Future Plans
 
 - Add web3 wallet authentication for secure access.
-- Extend chat retention beyond 24 hours if needed.
+- Implement manual chat cleanup if storage grows too large.
 
 ## Contact
 

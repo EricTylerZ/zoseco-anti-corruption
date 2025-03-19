@@ -102,7 +102,8 @@ def handle_query():
         }
         chat_history.append(ai_message)
 
-        redis_client.setex(chat_id, 86400, json.dumps(chat_history))
+        # Save without expiration
+        redis_client.set(chat_id, json.dumps(chat_history))  # Changed from setex to set
         logger.info(f"Saved chat history for chat_id: {chat_id}")
         return jsonify({
             "response": ai_response,
