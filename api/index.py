@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # Venice AI API configuration
-VENICE_API_URL = "https://api.venice.ai/api/v1/chat/completions"  # Corrected URL
+VENICE_API_URL = "https://api.venice.ai/api/v1/chat/completions"
 VENICE_API_KEY = os.environ.get("VENICE_API_KEY", "your-venice-api-key-here")
 
 # Upstash Redis configuration
@@ -25,10 +25,30 @@ except Exception as e:
     logger.error(f"Redis connection failed: {e}")
     redis_client = None
 
+# Fetch most intelligent model at startup
+def get_most_intelligent_model():
+    try:
+        headers = {"Authorization": f"Bearer {VENICE_API_KEY}"}
+        response = requests.get("https://api.venice.ai/api/v1/models", headers=headers, timeout=5)
+        response.raise_for_status()
+        models = response.json()["data"]
+        for model in models:
+            if "most_intelligent" in model.get("traits", []):
+                logger.info(f"Selected most intelligent model: {model['id']}")
+                return model["id"]
+        logger.warning("No 'most_intelligent' model found, falling back to 'default'")
+        return "default"
+    except Exception as e:
+        logger.error(f"Failed to fetch models: {e}")
+        return "default"
+
+MODEL_ID = get_most_intelligent_model()  # Set model at startup
+
 @app.route("/", methods=["GET"])
 def test_route():
     logger.info("Root route accessed")
-    return jsonify({"message": "API is running", "redis_connected": bool(redis_client)})
+    key_preview = VENICE_API_KEY[:4] + "..." if VENICE_API_KEY else "Not set"
+    return jsonify({"message": "API is running", "redis_connected": bool(redis_client), "venice_api_key_preview": key_preview, "selected_model": MODEL_ID})
 
 @app.route("/api/query", methods=["POST"])
 def handle_query():
@@ -54,7 +74,7 @@ def handle_query():
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "mixtral-8x7b",
+        "model": MODEL_ID,  # Use dynamically selected model
         "messages": [
             {"role": "system", "content": "You are an anti-corruption expert assisting users at zoseco.com. Be concise and helpful."},
             *chat_history[-5:],
@@ -64,7 +84,7 @@ def handle_query():
     }
 
     try:
-        logger.info(f"Sending request to Venice AI: {payload}")
+        logger.info(f"Sending request to Venice AI with key: {VENICE_API_KEY[:4]}... - Payload: {payload}")
         response = requests.post(VENICE_API_URL, headers=headers, json=payload, timeout=10)
         response.raise_for_status()
         result = response.json()
