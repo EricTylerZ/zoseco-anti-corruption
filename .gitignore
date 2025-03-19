@@ -5,11 +5,9 @@ __pycache__/
 *.pyc
 .vercel
 
-
-parse_chats.py
+data/ 
 
 anti_corruption_chats.json
-
 anti_corruption_chats_pretty.json
-user_messages.jsonparse_chats.py 
-data/ 
+user_messages.json
+parse_chats.py 
