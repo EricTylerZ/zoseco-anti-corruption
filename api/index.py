@@ -5,7 +5,7 @@ import os
 import redis
 import json
 import logging
-
+from datetime import datetime
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -31,6 +31,9 @@ except Exception as e:
 # System prompt from environment variable
 SYSTEM_PROMPT = os.environ.get("SYSTEM_PROMPT", "You are an anti-corruption expert. Be concise and helpful.")
 
+# Model used
+MODEL = "llama-3.1-405b"
+
 @app.route("/", methods=["GET"])
 def test_route():
     logger.info("Root route accessed")
@@ -53,7 +56,17 @@ def handle_query():
     # Load history
     chat_history_json = redis_client.get(chat_id)
     chat_history = json.loads(chat_history_json) if chat_history_json else []
-    chat_history.append({"role": "user", "content": user_query})
+
+    # Add user message with metadata
+    user_message = {
+        "content": user_query,
+        "role": "user",
+        "timestamp": datetime.utcnow().isoformat(),
+        "ip": request.remote_addr,
+        "model": MODEL,
+        "tokens_in": len(user_query.split())  # Rough estimate
+    }
+    chat_history.append(user_message)
 
     # Venice AI API call
     headers = {
@@ -61,7 +74,7 @@ def handle_query():
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "llama-3.1-405b",
+        "model": MODEL,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             *chat_history[-5:],
@@ -78,7 +91,16 @@ def handle_query():
         logger.info(f"Venice AI response: {result}")
 
         ai_response = result["choices"][0]["message"]["content"].strip()
-        chat_history.append({"role": "assistant", "content": ai_response})
+        ai_message = {
+            "content": ai_response,
+            "role": "assistant",
+            "timestamp": datetime.utcnow().isoformat(),
+            "ip": request.remote_addr,
+            "model": MODEL,
+            "tokens_out": len(ai_response.split()),  # Rough estimate
+            "tokens_in": len(user_query.split())  # From request
+        }
+        chat_history.append(ai_message)
 
         redis_client.setex(chat_id, 86400, json.dumps(chat_history))
         logger.info(f"Saved chat history for chat_id: {chat_id}")
@@ -120,16 +142,13 @@ def get_all_chats():
 
     # Check for download parameter
     if request.args.get("download") == "true":
-        # Format JSON with indentation for readability
         formatted_json = json.dumps({"chats": all_chats}, indent=2)
-        # Return as a downloadable file
         return Response(
             formatted_json,
             mimetype="application/json",
             headers={"Content-Disposition": "attachment; filename=anti_corruption_chats.json"}
         )
     
-    # Default JSON response
     return jsonify({"chats": all_chats})
 
 if __name__ == "__main__":
