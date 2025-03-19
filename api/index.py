@@ -138,7 +138,27 @@ def get_all_chats():
         return jsonify({"error": "Unauthorized"}), 403
 
     keys = redis_client.keys("*")
-    all_chats = {key: json.loads(redis_client.get(key)) for key in keys if redis_client.get(key)}
+    all_chats = {}
+    for key in keys:
+        chat_history_json = redis_client.get(key)
+        if chat_history_json:
+            chat_history = json.loads(chat_history_json)
+            # Enrich old entries with default metadata if missing
+            enriched_history = []
+            for msg in chat_history:
+                if not isinstance(msg, dict):
+                    continue  # Skip malformed entries
+                enriched_msg = {
+                    "content": msg.get("content", ""),
+                    "role": msg.get("role", ""),
+                    "timestamp": msg.get("timestamp", datetime.utcnow().isoformat()),  # Default to now if missing
+                    "ip": msg.get("ip", "unknown"),  # Default if missing
+                    "model": msg.get("model", MODEL),  # Assume current model
+                    "tokens_in": msg.get("tokens_in", len(msg.get("content", "").split())),  # Estimate if missing
+                    "tokens_out": msg.get("tokens_out", len(msg.get("content", "").split())) if msg.get("role") == "assistant" else 0
+                }
+                enriched_history.append(enriched_msg)
+            all_chats[key] = enriched_history
 
     # Check for download parameter
     if request.args.get("download") == "true":
