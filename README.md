@@ -1,35 +1,42 @@
-## Installation Instructions
+# Anti-Corruption Bot
 
-1. **Set up the server:**
-   ```bash
-   pip install flask flask-socketio flask-cors requests
-   ```
+A simple AI-powered chatbot to help understand corruption scenarios in Valparaiso, Indiana.
 
-2. **Set environment variables:**
-   ```bash
-   export LLM_API_URL="https://api.openai.com/v1/chat/completions"  # or Venice.ai URL
-   export LLM_API_KEY="your-api-key-here"
-   ```
+## Overview
 
-3. **Start the server:**
-   ```bash
-   python app.py
-   ```
+The Anti-Corruption Bot is live at [zoseco.com/anti-corruption](https://zoseco.com/anti-corruption). It’s designed to:
+- Gather details about corruption rumors and situations in Valparaiso, Indiana.
+- Ask clarifying questions about key players and allegations.
+- Provide insights without suggesting reporting to authorities.
 
-4. **Add the widget to your website:**
-   Add this script tag to the bottom of your zoseco.com pages:
-   ```html
-   <script src="https://your-server-url.com/widget.js"></script>
-   ```
+## How It Works
 
-## Customization Options
+- **Frontend**: A chat interface built into the Zoseco WordPress site using Divi.
+- **Backend**: A Flask app hosted on Vercel, powered by the Venice AI API (`llama-3.1-405b` model).
+- **Storage**: Chat histories are stored in Upstash Redis with a 24-hour expiration.
 
-1. **Widget appearance:** Modify the CSS in the widget.js file
-2. **LLM integration:** Update the get_ai_response function in app.py
-3. **For Venice.ai:** Change the API URL and request format to match Venice.ai's API
-4. **Database storage:** Replace the in-memory storage with a database like SQLite, PostgreSQL, or MongoDB
-5. **User authentication:** Add login for admin users to access the dashboard
+## Usage
 
-Remember to replace placeholder values like "your-server-url.com" with your actual server address.
+1. Visit [zoseco.com/anti-corruption](https://zoseco.com/anti-corruption).
+2. Type a question or statement about corruption in Valparaiso, Indiana (e.g., "Rumors about a shady official").
+3. The bot responds with questions or insights to explore the scenario further.
 
-This gives you a complete chat system with both customer-facing widget and an admin dashboard, all with LLM integration and real-time messaging.
+## Features
+
+- Conversations are saved with metadata (timestamps, IP, token counts).
+- Admin access to view all chats (via a private endpoint).
+
+## Setup
+
+- **Deployed on Vercel**: Backend runs at `https://anti-corruption-bot.vercel.app`.
+- **Environment Variables**: Configured in Vercel (e.g., `VENICE_API_KEY`, `SYSTEM_PROMPT`).
+- **Local Testing**: Not included here—contact the admin for details.
+
+## Future Plans
+
+- Add web3 wallet authentication for secure access.
+- Extend chat retention beyond 24 hours if needed.
+
+## Contact
+
+For questions or support, reach out to the Zoseco team.
