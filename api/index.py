@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # Venice AI API configuration
-VENICE_API_URL = "https://api.venice.ai/v1/chat/completions"
+VENICE_API_URL = "https://api.venice.ai/api/v1/chat/completions"  # Corrected URL
 VENICE_API_KEY = os.environ.get("VENICE_API_KEY", "your-venice-api-key-here")
 
 # Upstash Redis configuration
