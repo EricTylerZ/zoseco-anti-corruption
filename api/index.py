@@ -159,7 +159,7 @@ def handle_query():
             {"role": "system", "content": SYSTEM_PROMPT},
             *chat_history[-5:],
         ],
-        "max_tokens": 77,
+        "max_tokens": 177,
         "temperature": 0.7
     }
 
