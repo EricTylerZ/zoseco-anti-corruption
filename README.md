@@ -7,7 +7,6 @@ A simple AI-powered chatbot to help understand corruption scenarios in Valparais
 The Anti-Corruption Bot is live at [zoseco.com/anti-corruption](https://zoseco.com/anti-corruption). It’s designed to:
 - Gather details about corruption rumors and situations in Valparaiso, Indiana.
 - Ask clarifying questions about key players and allegations.
-- Provide insights without suggesting reporting to authorities.
 
 ## How It Works
 
