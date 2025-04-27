@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, Response, send_from_directory, redirect, url_for, render_template_string
+from flask import Flask, request, jsonify, Response, redirect, url_for
 from flask_cors import CORS
 from flask_dance.contrib.github import make_github_blueprint, github
 from flask_dance.contrib.twitter import make_twitter_blueprint, twitter
@@ -20,7 +20,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__, static_folder='static')
+app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "your-secret-key-here")
 CORS(app)  # Enable CORS for all routes
 
@@ -54,8 +54,7 @@ def get_available_models():
     }
     try:
         response = requests.get(VENICE_MODELS_URL, headers=headers, timeout=5)
-        response 
-response.raise_for_status()
+        response.raise_for_status()
         models = response.json().get("data", [])
         logger.info(f"Fetched models: {models}")
         return models
@@ -298,6 +297,12 @@ def get_all_chats():
         return jsonify({"chats": {}})
 
 # Authentication routes
+@app.route("/api/check_auth")
+def check_auth():
+    if current_user.is_authenticated:
+        return jsonify({"authenticated": True, "user": current_user.id, "provider": current_user.provider})
+    return jsonify({"authenticated": False})
+
 @app.route("/login/github")
 def login_github():
     if not github.authorized:
@@ -457,11 +462,6 @@ def handle_purity_query():
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
-
-# Serve static files for frontend
-@app.route("/static/<path:filename>")
-def serve_static(filename):
-    return send_from_directory("static", filename)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
