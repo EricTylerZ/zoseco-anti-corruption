@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, Response, redirect, url_for
+from flask import Flask, request, jsonify, Response, redirect, url_for, render_template_string
 from flask_cors import CORS
 from flask_dance.contrib.github import make_github_blueprint, github
 from flask_dance.contrib.twitter import make_twitter_blueprint, twitter
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "your-secret-key-here")
-CORS(app)  # Enable CORS for all routes
+CORS(app, resources={r"/api/*": {"origins": "https://zoseco.com"}})  # Restrict to your WordPress domain
 
 # Venice AI API configuration
 VENICE_API_URL = "https://api.venice.ai/api/v1/chat/completions"
@@ -67,28 +67,24 @@ def select_best_model(models):
         logger.warning("No models available, using default")
         return "llama-3.3-70b"
     
-    # Prefer Mistral Small 3.1 24B
     for model in models:
         model_id = model.get("id", "")
         if model_id == "mistral-31-24b":
             logger.info(f"Selected preferred model: {model_id}")
             return model_id
     
-    # Fallback to "most_intelligent" trait
     for model in models:
         if "most_intelligent" in model.get("traits", []):
             model_id = model.get("id", "")
             logger.info(f"Selected most intelligent model: {model_id}")
             return model_id
     
-    # Fallback to "default" trait
     for model in models:
         if "default" in model.get("traits", []):
             model_id = model.get("id", "")
             logger.info(f"Selected default model: {model_id}")
             return model_id
     
-    # Final fallback
     logger.warning("No preferred models found, using default")
     return "llama-3.3-70b"
 
@@ -433,35 +429,178 @@ def handle_purity_query():
             "content": ai_response,
             "role": "assistant",
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "ip": request.remote_addr,
-            "model": MODEL,
-            "tokens_out": len(ai_response.split()),
-            "tokens_in": len(user_query.split())
-        }
-        chat_history.append(ai_message)
+        "ip": request.remote_addr,
+        "model": MODEL,
+        "tokens_out": len(ai_response.split()),
+        "tokens_in": len(user_query.split())
+    }
+    chat_history.append(ai_message)
 
-        if redis_client:
-            try:
-                if current_user.is_authenticated:
-                    redis_client.set(f"purity_chat:{chat_id}", json.dumps(chat_history))
-                    redis_client.set(f"user:{current_user.id}:purity_chat_id", chat_id)
-                else:
-                    redis_client.setex(f"purity_chat:{chat_id}", 24 * 60 * 60, json.dumps(chat_history))
-                logger.info(f"Saved purity chat history for chat_id: {chat_id}")
-            except Exception as e:
-                logger.error(f"Failed to save purity chat history: {e}")
+    if redis_client:
+        try:
+            if current_user.is_authenticated:
+                redis_client.set(f"purity_chat:{chat_id}", json.dumps(chat_history))
+                redis_client.set(f"user:{current_user.id}:purity_chat_id", chat_id)
+            else:
+                redis_client.setex(f"purity_chat:{chat_id}", 24 * 60 * 60, json.dumps(chat_history))
+            logger.info(f"Saved purity chat history for chat_id: {chat_id}")
+        except Exception as e:
+            logger.error(f"Failed to save purity chat history: {e}")
 
-        return jsonify({
-            "response": ai_response,
-            "chat_id": chat_id,
-            "history": chat_history
-        })
-    except requests.RequestException as e:
-        logger.error(f"Venice AI request failed: {str(e)}")
-        return jsonify({"error": f"Failed to get response from AI: {str(e)}"}), 500
-    except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
+    return jsonify({
+        "response": ai_response,
+        "chat_id": chat_id,
+        "history": chat_history
+    })
+except requests.RequestException as e:
+    logger.error(f"Venice AI request failed: {str(e)}")
+    return jsonify({"error": f"Failed to get response from AI: {str(e)}"}), 500
+except Exception as e:
+    logger.error(f"Unexpected error: {str(e)}")
+    return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
+
+# Standalone Purity Test page (optional)
+@app.route("/purity-test")
+def purity_test_page():
+    return render_template_string("""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Purity Test - Zoseco</title>
+            <style>
+                #auth-container { text-align: right; margin-bottom: 20px; }
+                #chat-container { text-align: center; }
+                #chat-container .subheader { text-align: left; max-width: 600px; margin: 0 auto; }
+                #chat-window { max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; margin: 20px auto; background-color: #f9f9f9; max-width: 600px; border-radius: 5px; }
+                .chat-input { display: flex; align-items: center; max-width: 600px; margin: 0 auto; }
+                .message { margin-bottom: 10px; }
+                .user-message { font-weight: bold; color: #00918B; }
+                .assistant-message { color: #333; }
+                .et_pb_button { display: inline-block; padding: 10px 20px; background-color: #00918B; color: #fff; text-decoration: none; border-radius: 5px; margin-left: 10px; }
+                textarea { flex-grow: 1; padding: 8px; margin: 0 10px; border: 1px solid #ddd; }
+                button { padding: 8px 16px; background-color: #00918B; color: #fff; border: none; cursor: pointer; }
+            </style>
+        </head>
+        <body>
+            <div id="auth-container">
+                <div class="auth-buttons">
+                    {% if not current_user.is_authenticated %}
+                        <a href="/login/github" class="et_pb_button">Sign in with GitHub</a>
+                        <a href="/login/twitter" class="et_pb_button">Sign in with X.com</a>
+                        <a href="/login/facebook" class="et_pb_button">Sign in with Facebook</a>
+                    {% else %}
+                        <span>Welcome, {{ current_user.id }} ({{ current_user.provider }})!</span>
+                        <a href="/logout" class="et_pb_button">Logout</a>
+                    {% endif %}
+                </div>
+            </div>
+            <div id="chat-container">
+                <h1>Welcome to Zoseco</h1>
+                <h2>How can we help you today?</h2>
+                <p class="subheader">
+                    If you are sharing tips but not logged in, your tips are initially considered far less trustworthy. 
+                    Logged in Users will be able to see some other tips provided by others and help verify trustworthiness. 
+                    The more trustworthy you prove to be, the more you will have access to. 
+                    By using this tool you agree to our <a href="/terms">Terms here</a>. Please review before sending anything.
+                </p>
+                <div id="chat-window"></div>
+                <div class="chat-input">
+                    <input type="file" id="attachment" style="display: none;" />
+                    <button id="attach-button">Upload File</button>
+                    <textarea id="message-input" rows="4" placeholder="What do you think is happening in Valparaiso? Or is it always sunny here?"></textarea>
+                    <button id="send-button">Send</button>
+                </div>
+            </div>
+            <script>
+                const SERVER_URL = "https://anti-corruption-bot-git-purity-test-erictylerzs-projects.vercel.app";
+                let chatId = localStorage.getItem("purity_chat_id");
+
+                // Check authentication status
+                fetch(`${SERVER_URL}/api/check_auth`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const authContainer = document.getElementById("auth-container");
+                        if (data.authenticated) {
+                            authContainer.innerHTML = `
+                                <span>Welcome, ${data.user} (${data.provider})!</span>
+                                <a href="${SERVER_URL}/logout" class="et_pb_button">Logout</a>
+                            `;
+                        }
+                    });
+
+                // Start a new chat if no chat_id exists
+                if (!chatId) {
+                    fetch(`${SERVER_URL}/api/purity/start_chat`, { method: "POST" })
+                        .then(response => response.json())
+                        .then(data => {
+                            chatId = data.chat_id;
+                            localStorage.setItem("purity_chat_id", chatId);
+                            loadHistory();
+                        });
+                } else {
+                    loadHistory();
+                }
+
+                // Load chat history
+                function loadHistory() {
+                    fetch(`${SERVER_URL}/api/purity/history?chat_id=${chatId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            const chatWindow = document.getElementById("chat-window");
+                            chatWindow.innerHTML = "";
+                            data.history.forEach(msg => displayMessage(msg.role, msg.content));
+                        })
+                        .catch(error => {
+                            console.error("History fetch error:", error);
+                            localStorage.removeItem("purity_chat_id");
+                            window.location.reload();
+                        });
+                }
+
+                // Send message
+                document.getElementById("send-button").addEventListener("click", () => {
+                    const messageInput = document.getElementById("message-input");
+                    const message = messageInput.value.trim();
+                    if (!message) return;
+                    displayMessage("user", message);
+                    fetch(`${SERVER_URL}/api/purity/query`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ chat_id: chatId, query: message })
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.error) {
+                                displayMessage("assistant", `Error: ${data.error}`);
+                            } else {
+                                displayMessage("assistant", data.response);
+                            }
+                        })
+                        .catch(error => {
+                            console.error("Query fetch error:", error);
+                            displayMessage("assistant", `Error: ${error.message}`);
+                        });
+                    messageInput.value = "";
+                });
+
+                // Attachment button (placeholder)
+                document.getElementById("attach-button").addEventListener("click", () => {
+                    document.getElementById("attachment").click();
+                });
+
+                // Display message in chat window
+                function displayMessage(role, content) {
+                    const chatWindow = document.getElementById("chat-window");
+                    const div = document.createElement("div");
+                    div.className = `message ${role}-message`;
+                    div.textContent = `${role === "user" ? "You" : "Assistant"}: ${content}`;
+                    chatWindow.appendChild(div);
+                    chatWindow.scrollTop = chatWindow.scrollHeight;
+                }
+            </script>
+        </body>
+        </html>
+    """, current_user=current_user)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
