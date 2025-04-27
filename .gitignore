@@ -9,7 +9,12 @@ data/
 
 anti_corruption_chats.json
 anti_corruption_chats_pretty.json
+anti-corruption-command-line*
+anti-corruption-system-prompt
+
+*.webp
 user_messages.json
 parse_chats.py 
 
 diff_output.txt
+
