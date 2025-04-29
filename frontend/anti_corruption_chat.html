@@ -1,8 +1,52 @@
-<div id="query-container" class="et_pb_module et_pb_text">
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><div id="query-container" class="et_pb_module et_pb_text">
     <h2 class="et_pb_module_header">Submit a Tip for Anti-Corruption Efforts</h2>
     <textarea id="query-input" rows="4" placeholder="Please share any information you have that could assist in ending corruption in Valparaiso Indiana. Your responses will be logged. If there is an imminent emergency please contact law enforcement. Zoseco is not law enforcement, and is only collecting and compiling information in the hopes of challenging corruption."></textarea>
     <div class="et_pb_button_module_wrapper">
         <a id="submit-query" class="et_pb_button et_pb_button_0" href="#">Send</a>
+        <?php if (!is_user_logged_in()) : ?>
+            <a href="<?php echo wp_login_url(get_permalink()); ?>" class="et_pb_button et_pb_button_1" style="margin-left: 10px;">Login</a>
+        <?php else : ?>
+            <a href="<?php echo wp_logout_url(get_permalink()); ?>" class="et_pb_button et_pb_button_1" style="margin-left: 10px;">Logout</a>
+        <?php endif; ?>
     </div>
     <div id="response-container" class="et_pb_text_inner"></div>
 </div>
@@ -23,7 +67,7 @@
     .et_pb_button_module_wrapper {
         display: inline-block;
     }
-    #submit-query.et_pb_button {
+    #submit-query.et_pb_button, .et_pb_button_1 {
         padding: 10px 20px;
         border-radius: 5px;
         transition: all 300ms ease 0ms;
@@ -52,10 +96,11 @@
 <script>
     const SERVER_URL = "https://anti-corruption-bot.vercel.app";
     let chatId = localStorage.getItem("chat_id") || Date.now().toString();
+    const userId = <?php echo is_user_logged_in() ? get_current_user_id() : 'null'; ?>;
 
     document.getElementById("submit-query").addEventListener("click", submitQuery);
 
-    fetch(`${SERVER_URL}/api/history?chat_id=${chatId}`, { method: "GET" })
+    fetch(`${SERVER_URL}/api/history?chat_id=${chatId}${userId ? `&user_id=${userId}` : ''}`, { method: "GET" })
         .then(response => {
             if (!response.ok) throw new Error(`History fetch failed: ${response.status}`);
             return response.json();
@@ -76,13 +121,16 @@
         responseContainer.innerHTML += `<div class="message user-message">You: ${query}</div>`;
 
         try {
+            const queryData = { query, chat_id: chatId };
+            if (userId) queryData.user_id = userId;
+
             const response = await fetch(`${SERVER_URL}/api/query`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     "Accept": "application/json"
                 },
-                body: JSON.stringify({ query, chat_id: chatId }),
+                body: JSON.stringify(queryData),
                 mode: "cors"
             });
 
