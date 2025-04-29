@@ -4,8 +4,8 @@
     <div class="et_pb_button_module_wrapper">
         <button id="submit-query" class="et_pb_button et_pb_button_0">Send</button>
         <?php if (!is_user_logged_in()) : ?>
-            <a href="/login" class="et_pb_button et_pb_button_1" style="margin-left: 10px;">Login</a>
-            <a href="/register" class="et_pb_button et_pb_button_1" style="margin-left: 10px;">Register</a>
+            <a href="<?php echo wp_login_url(); ?>" class="et_pb_button et_pb_button_1" style="margin-left: 10px;">Login</a>
+            <a href="<?php echo home_url('/register'); ?>" class="et_pb_button et_pb_button_1" style="margin-left: 10px;">Register</a>
         <?php else : ?>
             <a href="<?php echo wp_logout_url(get_permalink()); ?>" class="et_pb_button et_pb_button_1" style="margin-left: 10px;">Logout</a>
         <?php endif; ?>
@@ -66,6 +66,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const submitButton = document.getElementById("submit-query");
     if (submitButton) {
         submitButton.addEventListener("click", submitQuery);
+        console.log("Submit button event listener attached");
     } else {
         console.error("Submit button not found!");
     }

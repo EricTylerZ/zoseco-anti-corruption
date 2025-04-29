@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<head><title>Submit Tip</title></head>
+<body>
+    <h1>Submit a Tip</h1>
+    {% with messages = get_flashed_messages() %}{% if messages %}<ul>{% for msg in messages %}<li>{{ msg }}</li>{% endfor %}</ul>{% endif %}{% endwith %}
+    <form method="POST">
+        <textarea name="tip" rows="5" cols="50" placeholder="Your tip here" required></textarea><br>
+        <input type="submit" value="Submit">
+    </form>
+    <a href="{{ url_for('home') }}">Back</a>
+</body>
+</html>

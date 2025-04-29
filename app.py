@@ -1,158 +1,90 @@
-## Backend (app.py)
-from flask import Flask, render_template, request, jsonify, session
-from flask_socketio import SocketIO, emit, join_room
-from flask_cors import CORS
-import requests
-import os
-import uuid
-import datetime
+from flask import Flask, render_template, request, redirect, url_for, flash
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+import redis
 import json
+import os
+from datetime import datetime
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-here'
-socketio = SocketIO(app, cors_allowed_origins="*")
-CORS(app)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "a-simple-secret")
 
-# Simple in-memory storage (replace with database in production)
-chat_history = {}
-active_chats = {}
+# Redis setup (assumes REDIS_URL is set in Vercel environment)
+redis_client = redis.Redis.from_url(os.environ.get("REDIS_URL"), decode_responses=True)
 
-# LLM API configuration
-LLM_API_URL = os.environ.get('LLM_API_URL', 'https://api.openai.com/v1/chat/completions')
-LLM_API_KEY = os.environ.get('LLM_API_KEY', 'your-api-key-here')
+# Flask-Login setup
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "login"
 
-@app.route('/')
-def index():
-    return render_template('dashboard.html')
+class User(UserMixin):
+    def __init__(self, username):
+        self.id = username
 
-@app.route('/widget.js')
-def widget_js():
-    return app.send_static_file('widget.js')
+@login_manager.user_loader
+def load_user(username):
+    if redis_client.exists(f"user:{username}"):
+        return User(username)
+    return None
 
-@app.route('/api/start_chat', methods=['POST'])
-def start_chat():
-    data = request.json
-    chat_id = str(uuid.uuid4())
-    user_info = {
-        'name': data.get('name', 'Anonymous'),
-        'email': data.get('email', ''),
-        'started_at': datetime.datetime.now().isoformat()
-    }
-    
-    chat_history[chat_id] = []
-    active_chats[chat_id] = user_info
-    
-    # Notify admin dashboard
-    socketio.emit('new_chat', {'chat_id': chat_id, 'user_info': user_info}, room='admin')
-    
-    return jsonify({'chat_id': chat_id})
+@app.route("/")
+def home():
+    return render_template("home.html")
 
-@app.route('/api/chats', methods=['GET'])
-def get_chats():
-    return jsonify({
-        'active': active_chats,
-        'history': chat_history
-    })
-
-@socketio.on('connect')
-def handle_connect():
-    print(f"Client connected: {request.sid}")
-
-@socketio.on('join')
-def handle_join(data):
-    chat_id = data.get('chat_id')
-    user_type = data.get('user_type', 'visitor')
-    
-    if user_type == 'admin':
-        join_room('admin')
-        print(f"Admin joined: {request.sid}")
-    
-    if chat_id:
-        join_room(chat_id)
-        print(f"User joined chat {chat_id}: {request.sid}")
-        
-        # Send chat history to the user
-        if chat_id in chat_history:
-            emit('chat_history', {'messages': chat_history[chat_id]})
-
-@socketio.on('message')
-def handle_message(data):
-    chat_id = data.get('chat_id')
-    message = data.get('message')
-    sender = data.get('sender', 'visitor')
-    
-    if not chat_id or not message:
-        return
-    
-    timestamp = datetime.datetime.now().isoformat()
-    message_data = {
-        'text': message,
-        'sender': sender,
-        'timestamp': timestamp
-    }
-    
-    # Save to history
-    if chat_id not in chat_history:
-        chat_history[chat_id] = []
-    chat_history[chat_id].append(message_data)
-    
-    # Broadcast to room
-    emit('message', message_data, room=chat_id)
-    
-    # Also send to admin room
-    emit('message', {'chat_id': chat_id, **message_data}, room='admin')
-    
-    # If message is from visitor, get AI response
-    if sender == 'visitor':
-        ai_response = get_ai_response(chat_id, message)
-        if ai_response:
-            ai_message = {
-                'text': ai_response,
-                'sender': 'agent',
-                'timestamp': datetime.datetime.now().isoformat()
-            }
-            chat_history[chat_id].append(ai_message)
-            emit('message', ai_message, room=chat_id)
-            emit('message', {'chat_id': chat_id, **ai_message}, room='admin')
-
-def get_ai_response(chat_id, message):
-    """Get response from LLM API"""
-    try:
-        # Prepare context from chat history
-        context = []
-        if chat_id in chat_history:
-            for msg in chat_history[chat_id][-10:]:  # Last 10 messages for context
-                role = "assistant" if msg['sender'] == 'agent' else "user"
-                context.append({"role": role, "content": msg['text']})
-        
-        # If using OpenAI format
-        headers = {
-            "Authorization": f"Bearer {LLM_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "model": "gpt-3.5-turbo",  # Adjust based on your API
-            "messages": [
-                {"role": "system", "content": "You are a helpful assistant for zoseco.com. Be concise and friendly."},
-                *context,
-                {"role": "user", "content": message}
-            ],
-            "max_tokens": 150
-        }
-        
-        response = requests.post(LLM_API_URL, headers=headers, json=payload, timeout=10)
-        result = response.json()
-        
-        # Handle different API response formats (OpenAI example shown)
-        if 'choices' in result and len(result['choices']) > 0:
-            return result['choices'][0]['message']['content'].strip()
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        if redis_client.exists(f"user:{username}"):
+            flash("Username taken!")
         else:
-            return "I'm sorry, I couldn't process that request."
-            
-    except Exception as e:
-        print(f"Error getting AI response: {e}")
-        return "Sorry, I'm having trouble connecting to my brain right now."
+            hashed_password = generate_password_hash(password)
+            redis_client.set(f"user:{username}", json.dumps({"password": hashed_password}))
+            flash("Registered! Please log in.")
+            return redirect(url_for("login"))
+    return render_template("register.html")
 
-if __name__ == '__main__':
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        user_data = redis_client.get(f"user:{username}")
+        if user_data and check_password_hash(json.loads(user_data)["password"], password):
+            login_user(User(username))
+            flash("Logged in!")
+            return redirect(url_for("home"))
+        flash("Wrong username or password.")
+    return render_template("login.html")
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    flash("Logged out.")
+    return redirect(url_for("home"))
+
+@app.route("/submit", methods=["GET", "POST"])
+def submit_tip():
+    if request.method == "POST":
+        tip = request.form["tip"]
+        user_id = current_user.id if current_user.is_authenticated else None
+        tip_id = redis_client.incr("tip_counter")
+        tip_data = {"content": tip, "user_id": user_id, "timestamp": datetime.now().isoformat()}
+        redis_client.set(f"tip:{tip_id}", json.dumps(tip_data))
+        if user_id:
+            redis_client.rpush(f"user_tips:{user_id}", tip_id)
+        flash("Tip submitted!")
+        return redirect(url_for("home"))
+    return render_template("submit.html")
+
+@app.route("/my-tips")
+@login_required
+def my_tips():
+    tip_ids = redis_client.lrange(f"user_tips:{current_user.id}", 0, -1)
+    tips = [json.loads(redis_client.get(f"tip:{tip_id}")) for tip_id in tip_ids if redis_client.get(f"tip:{tip_id}")]
+    return render_template("my_tips.html", tips=tips)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)

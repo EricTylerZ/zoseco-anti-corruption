@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head><title>My Tips</title></head>
+<body>
+    <h1>My Tips</h1>
+    {% with messages = get_flashed_messages() %}{% if messages %}<ul>{% for msg in messages %}<li>{{ msg }}</li>{% endfor %}</ul>{% endif %}{% endwith %}
+    {% if tips %}
+        <ul>
+        {% for tip in tips %}
+            <li>{{ tip.content }} ({{ tip.timestamp }})</li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>No tips yet.</p>
+    {% endif %}
+    <a href="{{ url_for('home') }}">Back</a>
+</body>
+</html>
