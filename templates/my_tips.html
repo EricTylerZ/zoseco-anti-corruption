@@ -1,9 +1,12 @@
 <!DOCTYPE html>
-<html>
-<head><title>My Tips</title></head>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Tips</title>
+</head>
 <body>
     <h1>My Tips</h1>
-    {% with messages = get_flashed_messages() %}{% if messages %}<ul>{% for msg in messages %}<li>{{ msg }}</li>{% endfor %}</ul>{% endif %}{% endwith %}
     {% if tips %}
         <ul>
         {% for tip in tips %}
@@ -11,8 +14,8 @@
         {% endfor %}
         </ul>
     {% else %}
-        <p>No tips yet.</p>
+        <p>No tips submitted yet.</p>
     {% endif %}
-    <a href="{{ url_for('home') }}">Back</a>
+    <a href="{{ url_for('home') }}">Back to Home</a>
 </body>
 </html>

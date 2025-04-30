@@ -1,13 +1,17 @@
 <!DOCTYPE html>
-<html>
-<head><title>Submit Tip</title></head>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submit a Tip</title>
+</head>
 <body>
     <h1>Submit a Tip</h1>
-    {% with messages = get_flashed_messages() %}{% if messages %}<ul>{% for msg in messages %}<li>{{ msg }}</li>{% endfor %}</ul>{% endif %}{% endwith %}
     <form method="POST">
-        <textarea name="tip" rows="5" cols="50" placeholder="Your tip here" required></textarea><br>
-        <input type="submit" value="Submit">
+        <label for="tip">Your Tip:</label><br>
+        <textarea id="tip" name="tip" rows="4" cols="50" required></textarea><br>
+        <button type="submit">Submit</button>
     </form>
-    <a href="{{ url_for('home') }}">Back</a>
+    <a href="{{ url_for('home') }}">Back to Home</a>
 </body>
 </html>

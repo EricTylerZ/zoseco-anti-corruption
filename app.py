@@ -9,8 +9,23 @@ from datetime import datetime
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "a-simple-secret")
 
-# Redis setup (assumes REDIS_URL is set in Vercel environment)
-redis_client = redis.Redis.from_url(os.environ.get("REDIS_URL"), decode_responses=True)
+# Redis setup
+REDIS_URL = os.environ.get("REDIS_URL")
+redis_client = None
+if REDIS_URL:
+    try:
+        redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
+        redis_client.ping()
+        print("Redis connected successfully")
+    except Exception as e:
+        print(f"Redis connection failed: {e}")
+
+# Helper function to check Redis
+def check_redis():
+    if redis_client is None:
+        flash("Database error. Please try again later.")
+        return False
+    return True
 
 # Flask-Login setup
 login_manager = LoginManager()
@@ -23,16 +38,19 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(username):
-    if redis_client.exists(f"user:{username}"):
+    if check_redis() and redis_client.exists(f"user:{username}"):
         return User(username)
     return None
 
+# Routes
 @app.route("/")
 def home():
     return render_template("home.html")
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
+    if not check_redis():
+        return redirect(url_for("home"))
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
@@ -47,6 +65,8 @@ def register():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    if not check_redis():
+        return redirect(url_for("home"))
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
@@ -67,6 +87,8 @@ def logout():
 
 @app.route("/submit", methods=["GET", "POST"])
 def submit_tip():
+    if not check_redis():
+        return redirect(url_for("home"))
     if request.method == "POST":
         tip = request.form["tip"]
         user_id = current_user.id if current_user.is_authenticated else None
@@ -82,6 +104,8 @@ def submit_tip():
 @app.route("/my-tips")
 @login_required
 def my_tips():
+    if not check_redis():
+        return redirect(url_for("home"))
     tip_ids = redis_client.lrange(f"user_tips:{current_user.id}", 0, -1)
     tips = [json.loads(redis_client.get(f"tip:{tip_id}")) for tip_id in tip_ids if redis_client.get(f"tip:{tip_id}")]
     return render_template("my_tips.html", tips=tips)

@@ -1,18 +1,20 @@
 <!DOCTYPE html>
-<html>
-<head><title>Home</title></head>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home</title>
+</head>
 <body>
-    <h1>Anti-Corruption Tips</h1>
-    {% with messages = get_flashed_messages() %}{% if messages %}<ul>{% for msg in messages %}<li>{{ msg }}</li>{% endfor %}</ul>{% endif %}{% endwith %}
-    <nav>
-        <a href="{{ url_for('submit_tip') }}">Submit Tip</a> |
-        {% if current_user.is_authenticated %}
-            <a href="{{ url_for('my_tips') }}">My Tips</a> |
-            <a href="{{ url_for('logout') }}">Logout</a>
-        {% else %}
-            <a href="{{ url_for('login') }}">Login</a> |
-            <a href="{{ url_for('register') }}">Register</a>
-        {% endif %}
-    </nav>
+    <h1>Welcome to the Anti-Corruption Bot</h1>
+    {% if current_user.is_authenticated %}
+        <p>Hello, {{ current_user.id }}!</p>
+        <a href="{{ url_for('submit_tip') }}">Submit a Tip</a> |
+        <a href="{{ url_for('my_tips') }}">My Tips</a> |
+        <a href="{{ url_for('logout') }}">Logout</a>
+    {% else %}
+        <a href="{{ url_for('login') }}">Login</a> |
+        <a href="{{ url_for('register') }}">Register</a>
+    {% endif %}
 </body>
 </html>

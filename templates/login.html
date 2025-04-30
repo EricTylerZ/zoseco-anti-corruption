@@ -1,14 +1,19 @@
 <!DOCTYPE html>
-<html>
-<head><title>Login</title></head>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+</head>
 <body>
     <h1>Login</h1>
-    {% with messages = get_flashed_messages() %}{% if messages %}<ul>{% for msg in messages %}<li>{{ msg }}</li>{% endfor %}</ul>{% endif %}{% endwith %}
     <form method="POST">
-        Username: <input type="text" name="username" required><br>
-        Password: <input type="password" name="password" required><br>
-        <input type="submit" value="Login">
+        <label for="username">Username:</label>
+        <input type="text" id="username" name="username" required><br>
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required><br>
+        <button type="submit">Login</button>
     </form>
-    <a href="{{ url_for('home') }}">Back</a>
+    <a href="{{ url_for('home') }}">Back to Home</a>
 </body>
 </html>
