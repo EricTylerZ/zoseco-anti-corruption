@@ -24,7 +24,7 @@ CORS(app, supports_credentials=True, origins=["https://zoseco.com"])  # Allow cr
 # Session configuration
 app.config['SESSION_TYPE'] = 'redis'
 app.config['SESSION_REDIS'] = redis.Redis.from_url(os.environ.get("REDIS_URL"), decode_responses=True)
-app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', 'default_secret_key')  # Set via env variable
+app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', 'default_secret_key')
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_SECURE'] = True
 sess = Session(app)
@@ -39,7 +39,7 @@ REDIS_URL = os.environ.get("REDIS_URL")
 redis_client = None
 if REDIS_URL:
     try:
-        redis_client = app.config['SESSION_REDIS']  # Reuse the same Redis instance
+        redis_client = app.config['SESSION_REDIS']
         redis_client.ping()
         logger.info("Redis connected successfully")
     except Exception as e:
@@ -257,7 +257,7 @@ def get_history():
     if not redis_client:
         return jsonify({"history": []})
 
-    chat_id = session['username']  # Use username as chat_id
+    chat_id = session['username']
     try:
         chat_history_json = redis_client.get(chat_id)
         chat_history = json.loads(chat_history_json) if chat_history_json else []
