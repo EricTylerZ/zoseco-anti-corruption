@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zoseco Anti-Corruption Tipline</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+        }
+        .form-container, .tipline-container {
+            margin: 20px 0;
+        }
+        input, textarea, button {
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #response-container {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .message {
+            margin: 10px 0;
+        }
+        .user-message {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .assistant-message {
+            color: #333;
+        }
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>Zoseco Anti-Corruption Tipline</h1>
+
+    <div id="auth-container" class="form-container">
+        <h2 id="auth-title">Login</h2>
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <button id="auth-button">Login</button>
+        <button id="toggle-auth">Switch to Register</button>
+    </div>
+
+    <div id="tipline-container" class="tipline-container" style="display: none;">
+        <textarea id="query-input" rows="4" placeholder="Share information to help end corruption in Valparaiso, Indiana."></textarea>
+        <button id="submit-query">Submit Tip</button>
+        <div id="response-container"></div>
+    </div>
+
+    <button id="logout-button" style="display: none;">Logout</button>
+
+    <script>
+        const SERVER_URL = "/api";
+        let isLoginMode = true;
+
+        // DOM elements
+        const authContainer = document.getElementById("auth-container");
+        const tiplineContainer = document.getElementById("tipline-container");
+        const logoutButton = document.getElementById("logout-button");
+        const authTitle = document.getElementById("auth-title");
+        const authButton = document.getElementById("auth-button");
+        const toggleAuthButton = document.getElementById("toggle-auth");
+        const usernameInput = document.getElementById("username");
+        const passwordInput = document.getElementById("password");
+        const queryInput = document.getElementById("query-input");
+        const submitQueryButton = document.getElementById("submit-query");
+        const responseContainer = document.getElementById("response-container");
+
+        // Check login status
+        async function checkLogin() {
+            try {
+                const response = await fetch(`${SERVER_URL}/check_login`, { credentials: "include" });
+                const data = await response.json();
+                if (data.logged_in) {
+                    authContainer.style.display = "none";
+                    tiplineContainer.style.display = "block";
+                    logoutButton.style.display = "block";
+                    loadHistory();
+                } else {
+                    authContainer.style.display = "block";
+                    tiplineContainer.style.display = "none";
+                    logoutButton.style.display = "none";
+                }
+            } catch (error) {
+                console.error("Error checking login:", error);
+                responseContainer.innerHTML += `<div class="message error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Toggle between login and register
+        toggleAuthButton.addEventListener("click", () => {
+            isLoginMode = !isLoginMode;
+            authTitle.textContent = isLoginMode ? "Login" : "Register";
+            authButton.textContent = isLoginMode ? "Login" : "Register";
+            toggleAuthButton.textContent = isLoginMode ? "Switch to Register" : "Switch to Login";
+        });
+
+        // Handle authentication
+        authButton.addEventListener("click", async () => {
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value.trim();
+            if (!username || !password) {
+                responseContainer.innerHTML = `<div class="message error">Please enter username and password</div>`;
+                return;
+            }
+
+            const endpoint = isLoginMode ? "login" : "register";
+            try {
+                const response = await fetch(`${SERVER_URL}/${endpoint}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username, password }),
+                    credentials: "include"
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    responseContainer.innerHTML = `<div class="message">${data.message}</div>`;
+                    if (isLoginMode) {
+                        authContainer.style.display = "none";
+                        tiplineContainer.style.display = "block";
+                        logoutButton.style.display = "block";
+                        loadHistory();
+                    }
+                    usernameInput.value = "";
+                    passwordInput.value = "";
+                } else {
+                    responseContainer.innerHTML = `<div class="message error">${data.error}</div>`;
+                }
+            } catch (error) {
+                console.error(`Error in ${endpoint}:`, error);
+                responseContainer.innerHTML += `<div class="message error">Error: ${error.message}</div>`;
+            }
+        });
+
+        // Handle logout
+        logoutButton.addEventListener("click", async () => {
+            try {
+                const response = await fetch(`${SERVER_URL}/logout`, {
+                    method: "POST",
+                    credentials: "include"
+                });
+                const data = await response.json();
+                responseContainer.innerHTML = `<div class="message">${data.message}</div>`;
+                authContainer.style.display = "block";
+                tiplineContainer.style.display = "none";
+                logoutButton.style.display = "none";
+                responseContainer.innerHTML = "";
+            } catch (error) {
+                console.error("Error in logout:", error);
+                responseContainer.innerHTML += `<div class="message error">Error: ${error.message}</div>`;
+            }
+        });
+
+        // Submit query
+        submitQueryButton.addEventListener("click", async () => {
+            const query = queryInput.value.trim();
+            if (!query) {
+                responseContainer.innerHTML = `<div class="message error">Please enter a query</div>`;
+                return;
+            }
+
+            try {
+                responseContainer.innerHTML += `<div class="message user-message">You: ${query}</div>`;
+                const response = await fetch(`${SERVER_URL}/query`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ query }),
+                    credentials: "include"
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    responseContainer.innerHTML += `<div class="message assistant-message">Assistant: ${data.response}</div>`;
+                } else {
+                    responseContainer.innerHTML += `<div class="message error">Error: ${data.error}</div>`;
+                }
+                queryInput.value = "";
+                responseContainer.scrollTop = responseContainer.scrollHeight;
+            } catch (error) {
+                console.error("Error in query:", error);
+                responseContainer.innerHTML += `<div class="message error">Error: ${error.message}</div>`;
+            }
+        });
+
+        // Load chat history
+        async function loadHistory() {
+            try {
+                const response = await fetch(`${SERVER_URL}/history`, { credentials: "include" });
+                const data = await response.json();
+                responseContainer.innerHTML = "";
+                data.history.forEach(msg => {
+                    const className = msg.role === "user" ? "user-message" : "assistant-message";
+                    const prefix = msg.role === "user" ? "You" : "Assistant";
+                    responseContainer.innerHTML += `<div class="message ${className}">${prefix}: ${msg.content}</div>`;
+                });
+                responseContainer.scrollTop = responseContainer.scrollHeight;
+            } catch (error) {
+                console.error("Error loading history:", error);
+                responseContainer.innerHTML += `<div class="message error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Initial check
+        checkLogin();
+    </script>
+</body>
+</html>

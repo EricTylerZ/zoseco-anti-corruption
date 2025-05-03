@@ -19,11 +19,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, origins=["https://zoseco.com"])
+# Allow CORS for WordPress and Vercel domains
+CORS(app, supports_credentials=True, origins=[
+    "https://zoseco.com",
+    "https://anti-corruption-bot-git-anti-corrup-4c4c17-erictylerzs-projects.vercel.app",
+    "https://anti-corruption-bot.vercel.app"
+])
 
 # Session configuration
 app.config['SESSION_TYPE'] = 'redis'
-app.config['SESSION_REDIS'] = redis.Redis.from_url(os.environ.get("REDIS_URL"), decode_responses=True)
+app.config['SESSION_REDIS'] = redis.Redis.from_url(os.environ.get("REDIS_URL", ""), decode_responses=True)
 app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', 'default_secret_key')
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_SECURE'] = True
@@ -32,7 +37,7 @@ sess = Session(app)
 # Venice AI API configuration
 VENICE_API_URL = "https://api.venice.ai/api/v1/chat/completions"
 VENICE_MODELS_URL = "https://api.venice.ai/api/v1/models"
-VENICE_API_KEY = os.environ.get("VENICE_API_KEY", "your-venice-api-key-here")
+VENICE_API_KEY = os.environ.get("VENICE_API_KEY", "")
 
 # Redis configuration
 REDIS_URL = os.environ.get("REDIS_URL")
@@ -52,6 +57,9 @@ SYSTEM_PROMPT = os.environ.get("SYSTEM_PROMPT", "You are an anti-corruption expe
 
 # Model selection logic
 def get_available_models():
+    if not VENICE_API_KEY:
+        logger.error("VENICE_API_KEY not set")
+        return []
     headers = {
         "Authorization": f"Bearer {VENICE_API_KEY}",
         "Content-Type": "application/json"
@@ -79,16 +87,11 @@ def select_best_model(models):
     
     for model in models:
         if "most_intelligent" in model.get("traits", []):
-            model_id = model.get("id", "")
-            logger.info(f"Selected most intelligent model: {model_id}")
-            return model_id
+            model_id = model.get("   return model_id
     
     for model in models:
-        if "default" in model.get("traits", []):
-            model_id = model.get("id", "")
-            logger.info(f"Selected default model: {model_id}")
-            return model_id
-    
+        if "default" in model.get("defau
+Starting new chunk from line: 14373
     logger.warning("No preferred models found, using default")
     return "llama-3.3-70b"
 
@@ -125,95 +128,116 @@ def login_required(f):
 
 @app.route("/", methods=["GET"])
 def test_route():
-    logger.info("Root route accessed")
-    key_preview = VENICE_API_KEY[:4] + "..." if VENICE_API_KEY else "Not set"
-    return jsonify({
-        "message": "API is running",
-        "redis_connected": bool(redis_client),
-        "venice_api_key_preview": key_preview,
-        "selected_model": MODEL
-    })
+    try:
+        logger.info("Root route accessed")
+        key_preview = VENICE_API_KEY[:4] + "..." if VENICE_API_KEY else "Not set"
+        return jsonify({
+            "message": "API is running",
+            "redis_connected": bool(redis_client),
+            "venice_api_key_preview": key_preview,
+            "selected_model": MODEL
+        })
+    except Exception as e:
+        logger.error(f"Error in test_route: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route("/api/register", methods=["POST"])
 def register():
-    data = request.json or {}
-    username = data.get('username')
-    password = data.get('password')
-    if not username or not password:
-        return jsonify({"error": "Username and password are required"}), 400
-    if redis_client.hget('users', username):
-        return jsonify({"error": "User already exists"}), 400
-    hashed_password = generate_password_hash(password)
-    redis_client.hset('users', username, hashed_password)
-    return jsonify({"message": "Registered successfully"}), 201
+    try:
+        data = request.json or {}
+        username = data.get('username')
+        password = data.get('password')
+        if not username or not password:
+            return jsonify({"error": "Username and password are required"}), 400
+        if redis_client and redis_client.hget('users', username):
+            return jsonify({"error": "User already exists"}), 400
+        hashed_password = generate_password_hash(password)
+        redis_client.hset('users', username, hashed_password)
+        return jsonify({"message": "Registered successfully"}), 201
+    except Exception as e:
+        logger.error(f"Error in register: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route("/api/login", methods=["POST"])
 def login():
-    data = request.json or {}
-    username = data.get('username')
-    password = data.get('password')
-    stored_hash = redis_client.hget('users', username)
-    if stored_hash and check_password_hash(stored_hash.decode('utf-8') if isinstance(stored_hash, bytes) else stored_hash, password):
-        session['username'] = username
-        return jsonify({"message": "Logged in successfully"}), 200
-    return jsonify({"error": "Invalid credentials"}), 401
+    try:
+        data = request.json or {}
+        username = data.get('username')
+        password = data.get('password')
+        if not redis_client:
+            return jsonify({"error": "Redis not connected"}), 500
+        stored_hash = redis_client.hget('users', username)
+        if stored_hash and check_password_hash(stored_hash.decode('utf-8') if isinstance(stored_hash, bytes) else stored_hash, password):
+            session['username'] = username
+            return jsonify({"message": "Logged in successfully"}), 200
+        return jsonify({"error": "Invalid credentials"}), 401
+    except Exception as e:
+        logger.error(f"Error in login: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route("/api/logout", methods=["POST"])
 def logout():
-    session.pop('username', None)
-    return jsonify({"message": "Logged out"}), 200
+    try:
+        session.pop('username', None)
+        return jsonify({"message": "Logged out"}), 200
+    except Exception as e:
+        logger.error(f"Error in logout: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route("/api/check_login", methods=["GET"])
 def check_login():
-    if 'username' in session:
-        return jsonify({"logged_in": True, "username": session['username']}), 200
-    return jsonify({"logged_in": False}), 200
+    try:
+        if 'username' in session:
+            return jsonify({"logged_in": True, "username": session['username']}), 200
+        return jsonify({"logged_in": False}), 200
+    except Exception as e:
+        logger.error(f"Error in check_login: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route("/api/query", methods=["POST"])
 @login_required
 def handle_query():
-    logger.info("Query route accessed")
-    data = request.json or {}
-    user_query = data.get("query", "")
-    chat_id = session['username']
-
-    if not user_query:
-        return jsonify({"error": "No query provided"}), 400
-
-    chat_history = []
-    if redis_client:
-        try:
-            chat_history_json = redis_client.get(chat_id)
-            chat_history = json.loads(chat_history_json) if chat_history_json else []
-        except Exception as e:
-            logger.error(f"Failed to load chat history: {e}")
-
-    user_message = {
-        "content": user_query,
-        "role": "user",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "ip": request.remote_addr,
-        "model": MODEL,
-        "tokens_in": len(user_query.split())
-    }
-    chat_history.append(user_message)
-
-    headers = {
-        "Authorization": f"Bearer {VENICE_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": MODEL,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            *chat_history[-5:],
-        ],
-        "max_tokens": 177,
-        "temperature": 0.7
-    }
-
     try:
-        logger.info(f"Sending request to Venice AI with key: {VENICE_API_KEY[:4]}... - Payload: {payload}")
+        logger.info("Query route accessed")
+        data = request.json or {}
+        user_query = data.get("query", "")
+        chat_id = session['username']
+
+        if not user_query:
+            return jsonify({"error": "No query provided"}), 400
+
+        chat_history = []
+        if redis_client:
+            try:
+                chat_history_json = redis_client.get(chat_id)
+                chat_history = json.loads(chat_history_json) if chat_history_json else []
+            except Exception as e:
+                logger.error(f"Failed to load chat history: {e}")
+
+        user_message = {
+            "content": user_query,
+            "role": "user",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "ip": request.remote_addr,
+            "model": MODEL,
+            "tokens_in": len(user_query.split())
+        }
+        chat_history.append(user_message)
+
+        headers = {
+            "Authorization": f"Bearer {VENICE_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": MODEL,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                *chat_history[-5:],
+            ],
+            "max_tokens": 177,
+            "temperature": 0.7
+        }
+
         response = requests.post(VENICE_API_URL, headers=headers, json=payload, timeout=10)
         response.raise_for_status()
         result = response.json()
@@ -247,36 +271,40 @@ def handle_query():
         logger.error(f"Venice AI request failed: {str(e)}")
         return jsonify({"error": f"Failed to get response from AI: {str(e)}"}), 500
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
+        logger.error(f"Unexpected error in handle_query: {str(e)}")
         return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 @app.route("/api/history", methods=["GET"])
 @login_required
 def get_history():
-    logger.info("History route accessed")
-    if not redis_client:
-        return jsonify({"history": []})
-
-    chat_id = session['username']
     try:
-        chat_history_json = redis_client.get(chat_id)
-        chat_history = json.loads(chat_history_json) if chat_history_json else []
-        return jsonify({"history": chat_history})
+        logger.info("History route accessed")
+        if not redis_client:
+            return jsonify({"history": []})
+
+        chat_id = session['username']
+        try:
+            chat_history_json = redis_client.get(chat_id)
+            chat_history = json.loads(chat_history_json) if chat_history_json else []
+            return jsonify({"history": chat_history})
+        except Exception as e:
+            logger.error(f"Failed to get history: {e}")
+            return jsonify({"history": []})
     except Exception as e:
-        logger.error(f"Failed to get history: {e}")
-        return jsonify({"history": []})
+        logger.error(f"Error in get_history: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route("/api/all_chats", methods=["GET"])
 def get_all_chats():
-    logger.info("All chats route accessed")
-    if not redis_client:
-        return jsonify({"chats": {}})
-
-    secret = request.args.get("secret")
-    if secret != os.environ.get("ADMIN_SECRET", "your-secret-here"):
-        return jsonify({"error": "Unauthorized"}), 403
-
     try:
+        logger.info("All chats route accessed")
+        if not redis_client:
+            return jsonify({"chats": {}})
+
+        secret = request.args.get("secret")
+        if secret != os.environ.get("ADMIN_SECRET", "your-secret-here"):
+            return jsonify({"error": "Unauthorized"}), 403
+
         keys = redis_client.keys("*")
         all_chats = {}
         for key in keys:
@@ -309,8 +337,8 @@ def get_all_chats():
         
         return jsonify({"chats": all_chats})
     except Exception as e:
-        logger.error(f"Failed to get all chats: {e}")
-        return jsonify({"chats": {}})
+        logger.error(f"Error in get_all_chats: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
