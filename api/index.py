@@ -11,7 +11,7 @@ import redis
 import json
 import logging
 
-# Load environment variables from .env file if present
+# Load environment variables
 load_dotenv()
 
 # Set up logging
@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, origins=["https://zoseco.com"])  # Allow credentials from zoseco.com
+CORS(app, supports_credentials=True, origins=["https://zoseco.com"])
 
 # Session configuration
 app.config['SESSION_TYPE'] = 'redis'
@@ -34,7 +34,7 @@ VENICE_API_URL = "https://api.venice.ai/api/v1/chat/completions"
 VENICE_MODELS_URL = "https://api.venice.ai/api/v1/models"
 VENICE_API_KEY = os.environ.get("VENICE_API_KEY", "your-venice-api-key-here")
 
-# Upstash Redis configuration
+# Redis configuration
 REDIS_URL = os.environ.get("REDIS_URL")
 redis_client = None
 if REDIS_URL:
@@ -47,7 +47,7 @@ if REDIS_URL:
 else:
     logger.warning("REDIS_URL not set, skipping Redis connection")
 
-# System prompt from environment variable
+# System prompt
 SYSTEM_PROMPT = os.environ.get("SYSTEM_PROMPT", "You are an anti-corruption expert. Be concise and helpful.")
 
 # Model selection logic
@@ -175,7 +175,7 @@ def handle_query():
     logger.info("Query route accessed")
     data = request.json or {}
     user_query = data.get("query", "")
-    chat_id = session['username']  # Use username as chat_id for logged-in users
+    chat_id = session['username']
 
     if not user_query:
         return jsonify({"error": "No query provided"}), 400
