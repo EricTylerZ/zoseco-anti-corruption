@@ -5,7 +5,8 @@ __pycache__/
 *.pyc
 .vercel
 
-data/ 
+data/*.json
+data/*.csv
 
 anti_corruption_chats.json
 anti_corruption_chats_pretty.json
