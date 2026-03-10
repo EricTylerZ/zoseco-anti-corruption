@@ -19,6 +19,9 @@ from config.settings import (
     MAX_DTE,
     PRICE_CACHE_TTL,
     OPTIONS_CACHE_TTL,
+    MOMENTUM_THRESHOLD,
+    MOMENTUM_LOOKBACK_DAYS,
+    MOMENTUM_STRONG_THRESHOLD,
 )
 
 
@@ -193,6 +196,131 @@ def _parse_option(option: dict, expiration: str, dte: int, option_type: str) -> 
         "open_interest": option.get("openInterest", 0),
         "implied_volatility": option.get("impliedVolatility", 0),
         "in_the_money": option.get("inTheMoney", False),
+    }
+
+
+def get_price_history(
+    ticker: str, days: int = 30, redis_client=None
+) -> Optional[List[Dict]]:
+    """
+    Fetch daily OHLC price history for a ticker.
+
+    Returns list of dicts with date, open, high, low, close, volume.
+    """
+    cache_key = f"fin:history:{ticker}:{days}"
+    cached = _cache_get(cache_key, redis_client)
+    if cached:
+        return json.loads(cached)
+
+    url = YAHOO_CHART_URL.format(ticker=ticker)
+    params = {
+        "range": f"{days}d",
+        "interval": "1d",
+    }
+    try:
+        resp = requests.get(url, headers=_HEADERS, params=params, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+
+        result = data["chart"]["result"][0]
+        timestamps = result.get("timestamp", [])
+        indicators = result.get("indicators", {}).get("quote", [{}])[0]
+
+        history = []
+        for i, ts in enumerate(timestamps):
+            history.append({
+                "date": datetime.fromtimestamp(ts).strftime("%Y-%m-%d"),
+                "open": indicators.get("open", [None])[i],
+                "high": indicators.get("high", [None])[i],
+                "low": indicators.get("low", [None])[i],
+                "close": indicators.get("close", [None])[i],
+                "volume": indicators.get("volume", [None])[i],
+            })
+
+        _cache_set(cache_key, json.dumps(history), PRICE_CACHE_TTL, redis_client)
+        return history
+    except Exception as e:
+        print(f"Error fetching price history for {ticker}: {e}")
+        return None
+
+
+def detect_momentum(
+    ticker: str,
+    direction: str = "bearish",
+    lookback_days: int = MOMENTUM_LOOKBACK_DAYS,
+    redis_client=None,
+) -> Dict:
+    """
+    Detect price momentum for a ticker.
+
+    Args:
+        ticker: Stock/ETF ticker
+        direction: Expected thesis direction ("bearish" or "bullish")
+        lookback_days: Number of days to measure momentum
+        redis_client: Optional Redis client
+
+    Returns dict with:
+        - ticker: str
+        - pct_change: float (% change over lookback)
+        - signal: "strong", "weak", or "none"
+        - aligned: bool (True if momentum matches thesis direction)
+        - strength: float (0.0 to 1.0)
+    """
+    history = get_price_history(ticker, lookback_days + 5, redis_client)
+
+    if not history or len(history) < 2:
+        return {
+            "ticker": ticker,
+            "pct_change": 0.0,
+            "signal": "none",
+            "aligned": False,
+            "strength": 0.0,
+        }
+
+    # Use the last `lookback_days` of data
+    recent = history[-lookback_days:] if len(history) >= lookback_days else history
+    first_close = recent[0].get("close")
+    last_close = recent[-1].get("close")
+
+    if not first_close or not last_close or first_close == 0:
+        return {
+            "ticker": ticker,
+            "pct_change": 0.0,
+            "signal": "none",
+            "aligned": False,
+            "strength": 0.0,
+        }
+
+    pct_change = (last_close - first_close) / first_close
+    abs_change = abs(pct_change)
+
+    # Determine if momentum aligns with thesis direction
+    if direction == "bearish":
+        aligned = pct_change < 0  # price dropping = good for bearish thesis
+    else:
+        aligned = pct_change > 0  # price rising = good for bullish thesis
+
+    # Signal strength
+    if abs_change >= MOMENTUM_STRONG_THRESHOLD:
+        signal = "strong"
+        strength = min(abs_change / MOMENTUM_STRONG_THRESHOLD, 2.0) / 2.0
+    elif abs_change >= MOMENTUM_THRESHOLD:
+        signal = "weak"
+        strength = abs_change / MOMENTUM_STRONG_THRESHOLD
+    else:
+        signal = "none"
+        strength = 0.0
+
+    # If not aligned, strength is negative (working against us)
+    if not aligned and signal != "none":
+        strength = -strength
+
+    return {
+        "ticker": ticker,
+        "pct_change": round(pct_change, 4),
+        "signal": signal,
+        "aligned": aligned,
+        "strength": round(strength, 3),
     }
 
 

@@ -10,7 +10,15 @@ When a position reaches 21 DTE (days to expiration), evaluate whether to:
 from datetime import datetime, timedelta
 from typing import List, Dict, Tuple
 
-from config.settings import ROLL_DTE_TRIGGER, TARGET_DTE, MIN_DTE, MAX_DTE
+from config.settings import (
+    ROLL_DTE_TRIGGER,
+    AGGRESSIVE_ROLL_DTE_TRIGGER,
+    TARGET_DTE,
+    MIN_DTE,
+    MAX_DTE,
+    PROFIT_TAKE_PCT,
+    AGGRESSIVE_PROFIT_TAKE_PCT,
+)
 from core.models import Position, SpreadTrade, ScanResult
 from strategy.scanner import scan_thesis
 from strategy.portfolio import Portfolio
@@ -110,6 +118,92 @@ def suggest_rolls(
             })
 
     return suggestions
+
+
+def find_positions_to_take_profit(
+    portfolio: Portfolio,
+    aggressive: bool = False,
+) -> List[Dict]:
+    """
+    Find open positions where current value has reached profit-take threshold.
+
+    In conservative mode: close at 50% of max profit.
+    In aggressive mode: close at 30% of max profit (faster recycling).
+
+    Returns list of dicts with position and profit info.
+    """
+    threshold = AGGRESSIVE_PROFIT_TAKE_PCT if aggressive else PROFIT_TAKE_PCT
+    open_positions = portfolio.get_open_positions()
+    to_take = []
+
+    for position in open_positions:
+        if not position.trade:
+            continue
+
+        max_profit = getattr(position.trade, "max_profit", None)
+        current_value = getattr(position, "current_value", None)
+        entry_cost = position.entry_cost
+
+        if max_profit is None or max_profit <= 0:
+            continue
+
+        # Calculate unrealized profit
+        # For debit spreads: profit = current_value - entry_cost
+        if current_value is not None:
+            unrealized_profit = current_value - entry_cost
+        else:
+            # Can't determine current value without live data
+            continue
+
+        profit_pct = unrealized_profit / max_profit if max_profit > 0 else 0
+
+        if profit_pct >= threshold:
+            to_take.append({
+                "position": position,
+                "unrealized_profit": unrealized_profit,
+                "max_profit": max_profit,
+                "profit_pct": profit_pct,
+                "threshold": threshold,
+                "recommendation": "take_profit",
+                "reason": (
+                    f"Position at {profit_pct:.0%} of max profit "
+                    f"(${unrealized_profit:.2f}/${max_profit:.2f}). "
+                    f"Threshold: {threshold:.0%}. Close and recycle capital."
+                ),
+            })
+
+    return to_take
+
+
+def format_profit_take_suggestions(suggestions: List[Dict]) -> str:
+    """Format profit-taking suggestions as readable text."""
+    if not suggestions:
+        return "No positions at profit-take threshold."
+
+    lines = []
+    lines.append("=" * 60)
+    lines.append("PROFIT-TAKING OPPORTUNITIES")
+    lines.append(f"Positions at threshold: {len(suggestions)}")
+    lines.append("=" * 60)
+
+    total_profit = 0.0
+    total_freed = 0.0
+
+    for s in suggestions:
+        pos = s["position"]
+        trade = pos.trade
+        lines.append(f"\nPosition {pos.id}: {trade.ticker} {trade.spread_type}")
+        lines.append(f"  Entry: ${pos.entry_cost:.2f}")
+        lines.append(f"  Unrealized P&L: ${s['unrealized_profit']:.2f} "
+                      f"({s['profit_pct']:.0%} of max ${s['max_profit']:.2f})")
+        lines.append(f"  Action: CLOSE and recycle ${pos.entry_cost + s['unrealized_profit']:.2f}")
+        total_profit += s["unrealized_profit"]
+        total_freed += pos.entry_cost + s["unrealized_profit"]
+
+    lines.append(f"\nTotal profit if closed: ${total_profit:.2f}")
+    lines.append(f"Total capital freed: ${total_freed:.2f}")
+    lines.append("\n" + "=" * 60)
+    return "\n".join(lines)
 
 
 def format_roll_suggestions(suggestions: List[Dict]) -> str:

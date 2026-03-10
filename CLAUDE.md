@@ -10,15 +10,26 @@ This is a live options trading system with $100 capital, built alongside the ant
 ## Quick Commands
 - Check positions: `python -m autonomous.runner --check`
 - Run scanner: `python -m autonomous.runner --scan`
+- Aggressive scan (weeklies): `python -m autonomous.runner --scan --aggressive`
+- Momentum signals: `python -m autonomous.runner --momentum`
+- Cascade detection: `python -m autonomous.runner --cascade`
 - Execute trades: `python -m autonomous.runner --execute`
+- Execute aggressive: `python -m autonomous.runner --execute --aggressive`
 - View P&L: `python -m autonomous.runner --summary`
 - Roll expiring: `python -m autonomous.runner --roll`
+- Roll with profit-taking: `python -m autonomous.runner --roll --aggressive`
+
+## Trading Modes
+- **Conservative** (default): 30-90 DTE monthly options, strict liquidity, static allocation
+- **Aggressive** (`-a`/`--aggressive`): 3-21 DTE weekly options, momentum-driven allocation, profit recycling at 30%
 
 ## Strategy Rules
 - Only debit spreads (capped risk, no margin needed)
-- Auto-roll at 21 DTE if thesis hasn't triggered
+- Auto-roll at 21 DTE (conservative) or 3 DTE (aggressive)
 - Never exceed $100 total capital deployed
-- Target tickers: TSN, DBA (beef), UUP, SLV, GDX (dollar), VNO, SLG (NYC housing)
+- Target tickers: TSN, DBA (beef), UUP, SLV, GDX, UVXY, TLT (dollar), VNO, SLG (NYC housing)
+- Momentum engine dynamically shifts allocation toward hot theses
+- Cascade mode: when all 3 theses show momentum, concentrate on fastest movers
 
 ## When to Update Strategy
 - If a thesis triggers (prices move significantly), take profits
