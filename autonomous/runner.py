@@ -255,6 +255,165 @@ def cmd_summary():
     print(f"\n{DISCLAIMER}")
 
 
+def cmd_advisor(args):
+    """Run an advisor tool."""
+    from strategy.advisor import (
+        iv_environment, csp_strike_finder, theta_decay_optimizer,
+        covered_call_timing, wheel_tracker, leap_checklist,
+        position_size_stress, earnings_risk_screen, strategy_decision,
+        leap_tax_timer, portfolio_correlation_audit, pre_trade_exit_plan,
+        list_advisors, ADVISOR_NAMES,
+    )
+
+    tool_num = args.advisor
+    if tool_num < 1 or tool_num > 12:
+        print(list_advisors())
+        return
+
+    redis_client = _get_redis()
+    ticker = getattr(args, "ticker", None)
+
+    print(f"Running Advisor #{tool_num}: {ADVISOR_NAMES[tool_num]}")
+    print()
+
+    if tool_num == 1:
+        if not ticker:
+            print("ERROR: --ticker required for IV Environment Scanner")
+            return
+        print(iv_environment(ticker, redis_client))
+
+    elif tool_num == 2:
+        if not ticker:
+            print("ERROR: --ticker required for CSP Strike Finder")
+            return
+        print(csp_strike_finder(ticker, redis_client))
+
+    elif tool_num == 3:
+        if not ticker:
+            print("ERROR: --ticker required for Theta Decay Optimizer")
+            return
+        premium = getattr(args, "premium", None)
+        if premium is None:
+            print("ERROR: --premium required for Theta Decay Optimizer")
+            return
+        dte = getattr(args, "dte", 30) or 30
+        opt_type = "put" if getattr(args, "put", False) else "call"
+        print(theta_decay_optimizer(ticker, opt_type, premium, dte, redis_client))
+
+    elif tool_num == 4:
+        if not ticker:
+            print("ERROR: --ticker required for Covered Call Timing")
+            return
+        cost_basis = getattr(args, "cost_basis", None)
+        if cost_basis is None:
+            print("ERROR: --cost-basis required for Covered Call Timing")
+            return
+        print(covered_call_timing(ticker, cost_basis, redis_client))
+
+    elif tool_num == 5:
+        if not ticker:
+            print("ERROR: --ticker required for Wheel Tracker")
+            return
+        cycles_json = getattr(args, "cycles", None)
+        if not cycles_json:
+            print("ERROR: --cycles required (JSON array)")
+            print('Example: --cycles \'[{"type":"csp","strike":50,"premium":1.50,"assigned":true}]\'')
+            return
+        try:
+            cycles = json.loads(cycles_json)
+        except json.JSONDecodeError:
+            print("ERROR: --cycles must be valid JSON")
+            return
+        print(wheel_tracker(ticker, cycles, redis_client))
+
+    elif tool_num == 6:
+        if not ticker:
+            print("ERROR: --ticker required for LEAP Checklist")
+            return
+        thesis = getattr(args, "thesis", None) or "No thesis provided"
+        print(leap_checklist(ticker, thesis, redis_client))
+
+    elif tool_num == 7:
+        if not ticker:
+            print("ERROR: --ticker required for Position Sizing")
+            return
+        capital = getattr(args, "capital", None)
+        if capital is None:
+            print("ERROR: --capital required for Position Sizing Stress Test")
+            return
+        positions_json = getattr(args, "positions", None)
+        existing = json.loads(positions_json) if positions_json else None
+        print(position_size_stress(ticker, capital, existing, redis_client))
+
+    elif tool_num == 8:
+        if not ticker:
+            print("ERROR: --ticker required for Earnings Risk Screen")
+            return
+        earnings_date = getattr(args, "earnings_date", None)
+        if not earnings_date:
+            print("ERROR: --earnings-date required (YYYY-MM-DD)")
+            return
+        position_info = {}
+        if getattr(args, "strategy_type", None):
+            position_info["strategy"] = args.strategy_type
+        if getattr(args, "strike", None):
+            position_info["strike"] = args.strike
+        if getattr(args, "premium", None):
+            position_info["premium"] = args.premium
+        print(earnings_risk_screen(ticker, earnings_date, position_info or None, redis_client))
+
+    elif tool_num == 9:
+        if not ticker:
+            print("ERROR: --ticker required for Strategy Decision")
+            return
+        conviction = getattr(args, "conviction", None) or "moderate"
+        capital = getattr(args, "capital", None)
+        if capital is None:
+            print("ERROR: --capital required for Strategy Decision")
+            return
+        print(strategy_decision(ticker, conviction, capital, redis_client))
+
+    elif tool_num == 10:
+        if not ticker:
+            print("ERROR: --ticker required for LEAP Tax Timer")
+            return
+        open_date = getattr(args, "open_date", None)
+        gain = getattr(args, "gain", None)
+        tax_bracket = getattr(args, "tax_bracket", None)
+        if not all([open_date, gain is not None, tax_bracket is not None]):
+            print("ERROR: --open-date, --gain, and --tax-bracket all required")
+            return
+        print(leap_tax_timer(ticker, open_date, gain, tax_bracket, redis_client))
+
+    elif tool_num == 11:
+        positions_json = getattr(args, "positions", None)
+        if not positions_json:
+            print("ERROR: --positions required (JSON array)")
+            print('Example: --positions \'[{"ticker":"AAPL","allocation_pct":20}]\'')
+            return
+        try:
+            positions = json.loads(positions_json)
+        except json.JSONDecodeError:
+            print("ERROR: --positions must be valid JSON")
+            return
+        print(portfolio_correlation_audit(positions))
+
+    elif tool_num == 12:
+        if not ticker:
+            print("ERROR: --ticker required for Pre-Trade Exit Plan")
+            return
+        strategy_type = getattr(args, "strategy_type", None)
+        strike = getattr(args, "strike", None)
+        expiration = getattr(args, "expiration", None)
+        premium = getattr(args, "premium", None)
+        if not all([strategy_type, strike, expiration, premium]):
+            print("ERROR: --strategy, --strike, --expiration, --premium all required")
+            return
+        print(pre_trade_exit_plan(ticker, strategy_type, strike, expiration, premium, redis_client))
+
+    print(f"\n{DISCLAIMER}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Financial Strategy Autonomous Runner",
@@ -271,6 +430,10 @@ Examples:
   python -m autonomous.runner --roll                      Check/suggest rolls
   python -m autonomous.runner --roll --aggressive         Roll with profit-taking
   python -m autonomous.runner --summary                   Portfolio P&L
+  python -m autonomous.runner --advisor 0                  List all advisor tools
+  python -m autonomous.runner --advisor 1 --ticker AAPL    IV Environment Scanner
+  python -m autonomous.runner --advisor 2 --ticker TSN     CSP Strike Finder
+  python -m autonomous.runner --advisor 9 --ticker AAPL --conviction high --capital 5000
         """,
     )
 
@@ -285,10 +448,38 @@ Examples:
     parser.add_argument("-a", "--aggressive", action="store_true",
                         help="Use aggressive mode (weekly options, momentum-driven)")
 
+    # Advisor tools (1-12)
+    parser.add_argument("--advisor", type=int, metavar="N",
+                        help="Run advisor tool N (1-12). Use --advisor 0 to list all tools")
+    parser.add_argument("--ticker", type=str, help="Target ticker symbol")
+    parser.add_argument("--premium", type=float, help="Premium collected (advisor 3, 8, 12)")
+    parser.add_argument("--cost-basis", type=float, dest="cost_basis",
+                        help="Cost basis per share (advisor 4)")
+    parser.add_argument("--dte", type=int, help="Days to expiration (advisor 3)")
+    parser.add_argument("--put", action="store_true", help="Put option (advisor 3)")
+    parser.add_argument("--call", action="store_true", help="Call option (advisor 3)")
+    parser.add_argument("--cycles", type=str, help="Wheel cycles JSON (advisor 5)")
+    parser.add_argument("--thesis", type=str, help="Investment thesis (advisor 6)")
+    parser.add_argument("--capital", type=float, help="Available capital (advisor 7, 9)")
+    parser.add_argument("--positions", type=str, help="Portfolio positions JSON (advisor 7, 11)")
+    parser.add_argument("--earnings-date", type=str, dest="earnings_date",
+                        help="Earnings date YYYY-MM-DD (advisor 8)")
+    parser.add_argument("--conviction", type=str, help="Conviction level: moderate/high/very_high (advisor 9)")
+    parser.add_argument("--open-date", type=str, dest="open_date",
+                        help="Position open date YYYY-MM-DD (advisor 10)")
+    parser.add_argument("--gain", type=float, help="Unrealized gain amount (advisor 10)")
+    parser.add_argument("--tax-bracket", type=float, dest="tax_bracket",
+                        help="Tax bracket percentage (advisor 10)")
+    parser.add_argument("--strategy", type=str, dest="strategy_type",
+                        help="Strategy type: csp/cc/leap (advisor 12)")
+    parser.add_argument("--strike", type=float, help="Strike price (advisor 12)")
+    parser.add_argument("--expiration", type=str, help="Expiration date YYYY-MM-DD (advisor 12)")
+
     args = parser.parse_args()
 
     commands = [args.check, args.scan, args.execute, args.roll,
-                args.summary, args.momentum, args.cascade]
+                args.summary, args.momentum, args.cascade,
+                args.advisor is not None]
     if not any(commands):
         parser.print_help()
         return
@@ -312,6 +503,8 @@ Examples:
         cmd_roll(aggressive=args.aggressive)
     if args.summary:
         cmd_summary()
+    if args.advisor is not None:
+        cmd_advisor(args)
 
 
 if __name__ == "__main__":

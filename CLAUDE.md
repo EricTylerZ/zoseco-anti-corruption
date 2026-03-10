@@ -34,6 +34,22 @@ This is a live options trading system with $100 capital, built alongside the ant
 - Momentum engine dynamically shifts allocation toward hot theses
 - Cascade mode: when all 3 theses show momentum, concentrate on fastest movers
 
+## Advisor Tools (1-12)
+Interactive analysis tools for options strategy decisions:
+- IV scan: `python -m autonomous.runner --advisor 1 --ticker AAPL`
+- CSP strike finder: `python -m autonomous.runner --advisor 2 --ticker TSN`
+- Theta decay: `python -m autonomous.runner --advisor 3 --ticker AAPL --premium 2.50 --dte 30 --put`
+- Covered call timing: `python -m autonomous.runner --advisor 4 --ticker AAPL --cost-basis 150`
+- Wheel tracker: `python -m autonomous.runner --advisor 5 --ticker AAPL --cycles '[{"type":"csp","strike":50,"premium":1.50,"assigned":true}]'`
+- LEAP checklist: `python -m autonomous.runner --advisor 6 --ticker AAPL --thesis "AI growth"`
+- Position sizing: `python -m autonomous.runner --advisor 7 --ticker AAPL --capital 50000`
+- Earnings risk: `python -m autonomous.runner --advisor 8 --ticker AAPL --earnings-date 2026-04-15`
+- Strategy decision: `python -m autonomous.runner --advisor 9 --ticker AAPL --conviction high --capital 5000`
+- LEAP tax timer: `python -m autonomous.runner --advisor 10 --ticker AAPL --open-date 2025-03-15 --gain 500 --tax-bracket 24`
+- Correlation audit: `python -m autonomous.runner --advisor 11 --positions '[{"ticker":"AAPL","allocation_pct":20},{"ticker":"MSFT","allocation_pct":15}]'`
+- Exit plan: `python -m autonomous.runner --advisor 12 --ticker AAPL --strategy csp --strike 150 --expiration 2026-04-17 --premium 3.20`
+- List all: `python -m autonomous.runner --advisor 0`
+
 ## When to Update Strategy
 - If a thesis triggers (prices move significantly), take profits
 - If new information changes a thesis, update config/theses.py
@@ -46,7 +62,7 @@ This is a live options trading system with $100 capital, built alongside the ant
 - `core/` - Data models and options math
 - `data/` - Market data fetching (Yahoo Finance)
 - `broker/` - Alpaca API integration
-- `strategy/` - Scanner, portfolio tracking, rolling logic
+- `strategy/` - Scanner, portfolio tracking, rolling logic, advisor tools
 - `autonomous/` - CLI runner for all operations
 - `tests/` - Unit tests
 
