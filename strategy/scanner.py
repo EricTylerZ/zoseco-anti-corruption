@@ -103,8 +103,8 @@ def scan_thesis(
     all_results = []
 
     for ticker, ticker_info in thesis["tickers"].items():
-        ticker_budget = budget * ticker_info["weight"]
         direction = ticker_info["direction"]
+        weight = ticker_info.get("weight", 0.1)
 
         chain = get_options_chain(
             ticker, settings["min_dte"], settings["max_dte"], redis_client
@@ -114,21 +114,30 @@ def scan_thesis(
 
         current_price = chain["current_price"]
 
+        # Use full thesis budget for each ticker - we pick the best deals
+        # across ALL tickers, not pre-split by weight
         if direction == "bearish":
             spreads = _find_put_spreads(
-                ticker, chain, current_price, ticker_budget,
+                ticker, chain, current_price, budget,
                 thesis_id, thesis["name"], settings
             )
         else:  # bullish
             spreads = _find_call_spreads(
-                ticker, chain, current_price, ticker_budget,
+                ticker, chain, current_price, budget,
                 thesis_id, thesis["name"], settings
             )
 
+        # Tag each result with its conviction weight for ranking
+        for spread in spreads:
+            spread.weight = weight
+
         all_results.extend(spreads)
 
-    # Sort by risk/reward ratio descending
-    all_results.sort(key=lambda r: r.risk_reward, reverse=True)
+    # Sort by weighted risk/reward: best deal on highest-conviction ticker wins
+    all_results.sort(
+        key=lambda r: r.risk_reward * r.weight,
+        reverse=True,
+    )
     return all_results
 
 

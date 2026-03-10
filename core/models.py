@@ -118,6 +118,7 @@ class ScanResult:
     current_price: float
     dte: int
     direction: str          # "bearish" or "bullish"
+    weight: float = 0.1     # conviction weight from thesis config
 
     def to_dict(self) -> dict:
         return asdict(self)

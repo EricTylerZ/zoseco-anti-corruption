@@ -27,7 +27,10 @@ This is a live options trading system with $100 capital, built alongside the ant
 - Only debit spreads (capped risk, no margin needed)
 - Auto-roll at 21 DTE (conservative) or 3 DTE (aggressive)
 - Never exceed $100 total capital deployed
-- Target tickers: TSN, DBA (beef), UUP, SLV, GDX, UVXY, TLT (dollar), VNO, SLG (NYC housing)
+- Target tickers (expanded universe, scanner picks best deals):
+  - Beef: TSN, PPC, BRFS, DBA, COW, MOO, CALM
+  - Dollar: UUP, UDN, SLV, GDX, GDXJ, GLD, SILJ, UVXY, VXX, TLT, TBT, XLF, KRE, BITO
+  - NYC Housing: VNO, SLG, BXP, PGRE, IYR, XLRE, REM, XHB, DBRG, NYC, ABR
 - Momentum engine dynamically shifts allocation toward hot theses
 - Cascade mode: when all 3 theses show momentum, concentrate on fastest movers
 
