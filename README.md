@@ -1,41 +1,38 @@
-# Anti-Corruption Bot
+# Zoseco Anti-Corruption
 
-A simple AI-powered chatbot to help understand corruption scenarios in Valparaiso, Indiana.
+Zoseco's first civic campaign. Launched on the Solemnity of Saint Joseph, 2025.
 
-## Overview
+## What This Is
 
-The Anti-Corruption Bot is live at [zoseco.com/anti-corruption](https://zoseco.com/anti-corruption). It’s designed to:
-- Gather details about corruption rumors and situations in Valparaiso, Indiana.
-- Ask clarifying questions about key players and allegations.
+Zoseco began in 2014 as a gathering place for a few Air Force officers who enjoyed each other's company. Over the years it became something more. The anti-corruption effort was the first time the household entered a civic fight publicly, under its own name.
+
+Valparaiso, Indiana was built by generations of honest people. That makes it a target for those who exploit honest systems. This project was built to consolidate what the community knows, recognize patterns that individuals cannot see alone, and make those patterns visible. Visibility is the one thing corruption cannot survive.
+
+The effort was launched on Saint Joseph's feast day because the work was placed under specific patronage. Joseph is the guardian, the man entrusted with protecting something precious that was not his by origin but was his by duty. Guarding the integrity of a community is a duty, not an opinion.
 
 ## How It Works
 
-- **Frontend**: A chat interface built into the Zoseco WordPress site using Divi.
-- **Backend**: A Flask app hosted on Vercel, powered by the Venice AI API (`llama-3.1-405b` model).
-- **Storage**: Chat histories are stored in Upstash Redis with no expiration.
+The original implementation was a Flask chatbot deployed on Vercel, embedded in the Zoseco WordPress site. The WordPress frontend is no longer active. The backend architecture:
 
-## Usage
+- **Backend**: Flask app on Vercel, powered by Venice AI API (`llama-3.1-405b`)
+- **Storage**: Chat histories in Upstash Redis
+- **Intake**: Conversations saved with metadata (timestamps, IP, token counts)
+- **Admin**: Private endpoint for reviewing all submitted chats
 
-1. Visit [zoseco.com/anti-corruption](https://zoseco.com/anti-corruption).
-2. Type a question or statement about corruption in Valparaiso, Indiana (e.g., "Rumors about a shady official").
-3. The bot responds with questions or insights to explore the scenario further.
+## Current Status
 
-## Features
+The WordPress frontend was retired in March 2026 when zoseco.com migrated to the Community Shield platform. The `/anti-corruption` URL currently redirects to the About page on zoseco.com. The backend on Vercel may still be running.
 
-- Conversations are saved with metadata (timestamps, IP, token counts).
-- Admin access to view all chats (via a private endpoint).
-
-## Setup
-
-- **Deployed on Vercel**: Backend runs at `https://anti-corruption-bot.vercel.app`.
-- **Environment Variables**: Configured in Vercel (e.g., `VENICE_API_KEY`, `SYSTEM_PROMPT`).
-- **Local Testing**: Not included here—contact the admin for details.
-
-## Future Plans
-
-- Add web3 wallet authentication for secure access.
-- Implement manual chat cleanup if storage grows too large.
+This project is being evaluated for integration into the current ecosystem. The intelligence consolidation function connects to the work that Sentinel (Eric's OSINT platform) now handles, though this effort predates Sentinel by months. The tip submission and community intake function is something the Community Shield platform could host natively.
 
 ## Contact
 
-For questions or support, reach out to the Zoseco team.
+- Phone: (219) 488-2689
+- Email: info@zoseco.com
+- Eric Zosso: eric@zoseco.com
+
+## Repository
+
+- **Created**: March 19, 2025
+- **Organization**: [Zoseco Incorporated](https://zoseco.com)
+- **Part of**: The [ericzosso.com](https://ericzosso.com) ecosystem
